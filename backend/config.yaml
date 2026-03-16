@@ -6,22 +6,11 @@ llm:
   api_version: 2024-05-01-preview
 
 automl:
-  max_iterations: 3
-  score_threshold: 0.85
-  task_type: auto  # auto, classification, regression
+  max_iterations: 12
+  score_threshold: 0.99
+  task_type: auto
   cv_folds: 3
 
-models:
-  - logistic_regression
-  - random_forest
-  - xgboost
-  - lightgbm
-  - svm
-  - decision_tree
-  - knn
-  - ridge
-  - lasso
-
 optuna:
-  n_trials: 15
-  direction: maximize  # maximize for classification, minimize for regression
+  n_trials: 8
+  direction: maximize

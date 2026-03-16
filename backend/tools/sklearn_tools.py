@@ -1,5 +1,9 @@
 from sklearn.linear_model import LogisticRegression, Ridge, Lasso
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import (
+    RandomForestClassifier, RandomForestRegressor,
+    GradientBoostingClassifier, GradientBoostingRegressor,
+    ExtraTreesClassifier, ExtraTreesRegressor,
+)
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.svm import SVC, SVR
@@ -11,29 +15,33 @@ from typing import Dict, Any, Tuple
 def get_sklearn_model(model_name: str, task_type: str, params: Dict[str, Any] = None):
     """Get sklearn model instance."""
     params = params or {}
-    
+
     models = {
         "classification": {
-            "logistic_regression": LogisticRegression,
-            "random_forest": RandomForestClassifier,
-            "decision_tree": DecisionTreeClassifier,
-            "knn": KNeighborsClassifier,
-            "svm": SVC,
+            "logistic_regression":  LogisticRegression,
+            "random_forest":        RandomForestClassifier,
+            "decision_tree":        DecisionTreeClassifier,
+            "knn":                  KNeighborsClassifier,
+            "svm":                  SVC,
+            "gradient_boosting":    GradientBoostingClassifier,
+            "extra_trees":          ExtraTreesClassifier,
         },
         "regression": {
-            "random_forest": RandomForestRegressor,
-            "decision_tree": DecisionTreeRegressor,
-            "knn": KNeighborsRegressor,
-            "svm": SVR,
-            "ridge": Ridge,
-            "lasso": Lasso,
+            "random_forest":        RandomForestRegressor,
+            "decision_tree":        DecisionTreeRegressor,
+            "knn":                  KNeighborsRegressor,
+            "svm":                  SVR,
+            "ridge":                Ridge,
+            "lasso":                Lasso,
+            "gradient_boosting":    GradientBoostingRegressor,
+            "extra_trees":          ExtraTreesRegressor,
         }
     }
-    
+
     model_class = models.get(task_type, {}).get(model_name)
     if not model_class:
         raise ValueError(f"Model {model_name} not supported for {task_type}")
-    
+
     return model_class(**params)
 
 def train_and_evaluate_sklearn(

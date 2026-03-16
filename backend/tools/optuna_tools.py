@@ -56,6 +56,20 @@ def get_search_space(model_name: str, trial: optuna.Trial) -> Dict[str, Any]:
         return {
             "alpha": trial.suggest_float("alpha", 0.01, 10.0, log=True),
         }
+    elif model_name == "gradient_boosting":
+        return {
+            "n_estimators":      trial.suggest_int("n_estimators", 50, 300),
+            "max_depth":         trial.suggest_int("max_depth", 3, 10),
+            "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3),
+            "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
+        }
+    elif model_name == "extra_trees":
+        return {
+            "n_estimators":      trial.suggest_int("n_estimators", 50, 300),
+            "max_depth":         trial.suggest_int("max_depth", 3, 20),
+            "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
+            "min_samples_leaf":  trial.suggest_int("min_samples_leaf", 1, 10),
+        }
     else:
         return {}
 
