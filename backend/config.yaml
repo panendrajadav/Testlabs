@@ -1,0 +1,16 @@
+llm:
+  provider: azure  # azure, openai, or anthropic
+  model: gpt-4o
+  temperature: 0.3
+  azure_endpoint: https://panendrajadav-1606-resource.services.ai.azure.com/models/chat/completions
+  api_version: 2024-05-01-preview
+
+automl:
+  max_iterations: 12
+  score_threshold: 0.99
+  task_type: auto
+  cv_folds: 3
+
+optuna:
+  n_trials: 8
+  direction: maximize
