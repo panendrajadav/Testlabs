@@ -6,11 +6,11 @@ llm:
   api_version: 2024-05-01-preview
 
 automl:
-  max_iterations: 12
-  score_threshold: 0.99
+  max_iterations: 10
+  score_threshold: 0.95
   task_type: auto
   cv_folds: 3
 
 optuna:
-  n_trials: 8
+  n_trials: 5
   direction: maximize

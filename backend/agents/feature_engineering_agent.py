@@ -37,12 +37,16 @@ def feature_engineering_agent(state: AutoMLState, config: Dict[str, Any]) -> Aut
     y = df_pd[target_col]
     
     n_features = X.shape[1]
-    
-    # LLM decides feature strategy
-    llm = create_llm(config)
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an expert ML engineer deciding feature engineering strategy."),
-        ("user", """Dataset has {n_features} features for {task_type} task.
+
+    # Skip LLM for small datasets or few features
+    if df.height < 500 or n_features <= 10:
+        llm_decision = "no, keep all"
+        logger.info("Small dataset or few features — keeping all features")
+    else:
+        llm = create_llm(config)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are an expert ML engineer deciding feature engineering strategy."),
+            ("user", """Dataset has {n_features} features for {task_type} task.
 
 Decide:
 - Should we do feature selection? (yes/no)
@@ -50,14 +54,16 @@ Decide:
 - Suggest K as a number between 5 and {n_features}
 
 Keep response brief: just "yes, K=X" or "no, keep all".""")
-    ])
-    
-    response = llm.invoke(prompt.format_messages(
-        n_features=n_features,
-        task_type=task_type
-    ))
-    
-    llm_decision = response.content
+        ])
+        try:
+            response = llm.invoke(prompt.format_messages(
+                n_features=n_features,
+                task_type=task_type
+            ))
+            llm_decision = response.content
+        except Exception as e:
+            logger.warning(f"LLM feature decision failed: {e} — keeping all features")
+            llm_decision = "no, keep all"
     logger.info(f"LLM Feature Engineering Decision: {llm_decision}")
     
     # Feature selection
@@ -65,7 +71,9 @@ Keep response brief: just "yes, K=X" or "no, keep all".""")
     
     if "yes" in llm_decision.lower() and n_features > 10:
         try:
-            k = min(int([s for s in llm_decision.split() if s.isdigit()][0]), n_features - 1)
+            import re
+            digits = re.findall(r'\d+', llm_decision)
+            k = min(int(digits[0]), n_features - 1) if digits else min(10, n_features - 1)
         except:
             k = min(10, n_features - 1)
         

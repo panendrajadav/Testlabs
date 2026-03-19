@@ -61,20 +61,25 @@ def _compute_roc(model, X, y, task_type: str) -> Dict[str, Any]:
         logger.warning(f"ROC computation failed: {e}")
         return {}
 
-def _compute_shap(model, X, feature_names: list, model_name: str) -> Dict[str, Any]:
-    """Compute SHAP values for feature importance."""
+def _compute_shap(model, X, y, feature_names: list, model_name: str) -> Dict[str, Any]:
+    """Compute SHAP values for feature importance on held-out data."""
     try:
         import shap
-        if model_name in ["xgboost", "lightgbm", "random_forest", "decision_tree"]:
+        if model_name in ["xgboost", "lightgbm", "random_forest", "decision_tree", "extra_trees", "gradient_boosting"]:
             explainer = shap.TreeExplainer(model)
             shap_vals = explainer.shap_values(X)
             if isinstance(shap_vals, list):
                 shap_vals = shap_vals[0]
             mean_abs = np.abs(shap_vals).mean(axis=0).tolist()
-        else:
+        elif model_name in ["logistic_regression", "ridge", "lasso"]:
             explainer = shap.LinearExplainer(model, X)
             shap_vals = explainer.shap_values(X)
             mean_abs = np.abs(shap_vals).mean(axis=0).tolist()
+        else:
+            # SVM, KNN — use permutation importance as fallback
+            from sklearn.inspection import permutation_importance
+            r = permutation_importance(model, X, y, n_repeats=5, random_state=42)
+            mean_abs = r.importances_mean.tolist()
 
         importance = sorted(
             zip(feature_names, mean_abs),
@@ -118,21 +123,39 @@ def evaluation_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
 
         metrics = result["metrics"]
         trained_model = result["model"]
+        X_test = result.get("X_test", X)
+        y_test = result.get("y_test", y)
 
-        # Add F1 if not present
+        # Add F1 if not present — use held-out test data
         if task_type == "classification" and "f1_score" not in metrics:
             from sklearn.metrics import f1_score
-            y_pred = trained_model.predict(X)
-            metrics["f1_score"] = round(float(f1_score(y, y_pred, average="weighted")), 4)
+            y_pred = trained_model.predict(X_test)
+            metrics["f1_score"] = round(float(f1_score(y_test, y_pred, average="weighted")), 4)
 
         primary_score = metrics.get("accuracy", metrics.get("r2_score", 0.0))
 
-        # Compute ROC and SHAP for best model candidate
-        roc_data = _compute_roc(trained_model, X, y, task_type)
+        # Penalise overfitting: if train score is much higher than CV score,
+        # reduce the effective score so an overfit model never wins
+        overfit_gap = metrics.get("overfit_gap", 0.0)
+        OVERFIT_THRESHOLD = 0.05   # >5% gap triggers penalty
+        if overfit_gap > OVERFIT_THRESHOLD:
+            penalty = (overfit_gap - OVERFIT_THRESHOLD) * 0.5
+            adjusted_score = max(0.0, primary_score - penalty)
+            logger.warning(
+                f"{model_name}: overfit gap={overfit_gap:.4f} → penalised score "
+                f"{primary_score:.4f} → {adjusted_score:.4f}"
+            )
+            metrics["overfit_penalty"] = round(penalty, 4)
+            primary_score = adjusted_score
+        else:
+            metrics["overfit_penalty"] = 0.0
+
+        # Compute ROC and SHAP on held-out test data only
+        roc_data = _compute_roc(trained_model, X_test, y_test, task_type)
         if roc_data:
             metrics["roc_auc"] = roc_data.get("auc", roc_data.get("curves", {}).get(str(list(roc_data.get("curves", {}).keys())[0]), {}).get("auc")) if roc_data else None
 
-        shap_data = _compute_shap(trained_model, X, feature_names, model_name)
+        shap_data = _compute_shap(trained_model, X_test, y_test, feature_names, model_name)
 
         logger.info(f"Model: {model_name}, Score: {primary_score:.4f}, Metrics: {metrics}")
 

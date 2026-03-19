@@ -18,9 +18,9 @@ def hyperparameter_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLSt
     X = df.drop(columns=[target_col]).values
     y = df[target_col].values
 
-    # Cap trials: 3 for small datasets, 8 otherwise — keeps it fast
+    # Cap trials: 2 for small datasets, 5 otherwise
     n_samples = X.shape[0]
-    n_trials  = 3 if n_samples < 500 else min(config["optuna"]["n_trials"], 8)
+    n_trials  = 2 if n_samples < 500 else min(config["optuna"]["n_trials"], 5)
 
     def objective(trial):
         try:
@@ -34,7 +34,8 @@ def hyperparameter_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLSt
             if task_type == "classification":
                 return result["metrics"].get("accuracy", 0.0)
             else:
-                return result["metrics"].get("r2_score", -result["metrics"].get("rmse", 999999))
+                # Use CV R² — never train R² which can be 1.0 on overfit models
+                return result["metrics"].get("r2_score", -999999)
         except Exception as e:
             logger.warning(f"Trial failed: {e}")
             return 0.0 if task_type == "classification" else -999999

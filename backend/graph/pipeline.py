@@ -51,16 +51,12 @@ def create_pipeline(config: Dict[str, Any], progress_hook=None) -> StateGraph:
 
         iteration  = state["iteration"]
         max_iter   = state["max_iterations"]
-        best_score = state["best_score"]
-        threshold  = state["score_threshold"]
-
-        logger.info(f"Decision Point - Iteration: {iteration}/{max_iter}, Best Score: {best_score:.4f}, Threshold: {threshold}")
 
         if iteration >= max_iter:
-            logger.info("Max iterations reached — ending pipeline")
+            logger.info(f"Max iterations ({max_iter}) reached — ending pipeline")
             return "end"
 
-        logger.info("Continuing to next model")
+        logger.info(f"Iteration {iteration}/{max_iter} — continuing to next model")
         return "continue"
     
     # Build graph
