@@ -1,0 +1,291 @@
+{
+  "experiment_id": "109544b2-3a8b-4b02-86f5-afd329490406_v1",
+  "dataset_id": "109544b2-3a8b-4b02-86f5-afd329490406",
+  "version": "v1",
+  "timestamp": "2026-03-22T14:42:38.587179+00:00",
+  "training_time_s": 76.68,
+  "dataset_hash": "e6efb7373ed52ac1",
+  "task_type": "regression",
+  "target_column": "Salary",
+  "selected_features": [
+    "",
+    "YearsExperience"
+  ],
+  "n_features": 2,
+  "best_model": "knn",
+  "best_score": 0.9221,
+  "best_params": {
+    "weights": "distance",
+    "n_neighbors": 3,
+    "metric": "manhattan"
+  },
+  "justification": "Knn ranked 1st out of 9 models with a composite score of 0.9221 (50% CV + 30% test + 20% stability). CV score: 0.9573 | Test score: 0.9217 | CV std dev: 0.0165 | Overfit gap: 0.0783. Highly stable across folds (std dev <= 0.03) \u2014 reliable on unseen data. Mild overfitting (gap 7.83%) \u2014 acceptable for most use cases. Optimal hyperparameters found via RandomizedSearchCV (5-fold): weights=distance, n_neighbors=3, metric=manhattan.",
+  "is_underfit": false,
+  "models_evaluated": [
+    {
+      "model_name": "knn",
+      "score": 0.9221,
+      "metrics": {
+        "r2_score": 0.9573,
+        "test_r2": 0.9217,
+        "train_r2": 1.0,
+        "rmse": 6325.8386,
+        "mae": 5804.0536,
+        "cv_std": 0.0165,
+        "cv_folds": 5,
+        "overfit_gap": 0.0783,
+        "overfit_penalty": 0.0,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "weights": "distance",
+          "n_neighbors": 3,
+          "metric": "manhattan"
+        },
+        "roc_auc": null
+      },
+      "params": {
+        "weights": "distance",
+        "n_neighbors": 3,
+        "metric": "manhattan"
+      }
+    },
+    {
+      "model_name": "random_forest",
+      "score": 0.886,
+      "metrics": {
+        "r2_score": 0.9528,
+        "test_r2": 0.8842,
+        "train_r2": 0.9961,
+        "rmse": 7690.1363,
+        "mae": 6966.3372,
+        "cv_std": 0.0231,
+        "cv_folds": 5,
+        "overfit_gap": 0.1119,
+        "overfit_penalty": 0.0095,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "n_estimators": 300,
+          "min_samples_leaf": 1,
+          "min_impurity_decrease": 0.0,
+          "max_features": 0.5,
+          "max_depth": 8
+        }
+      },
+      "params": {
+        "n_estimators": 300,
+        "min_samples_leaf": 1,
+        "min_impurity_decrease": 0.0,
+        "max_features": 0.5,
+        "max_depth": 8
+      }
+    },
+    {
+      "model_name": "elastic_net",
+      "score": 0.8707,
+      "metrics": {
+        "r2_score": 0.9448,
+        "test_r2": 0.8976,
+        "train_r2": 0.966,
+        "rmse": 7231.9616,
+        "mae": 6388.8548,
+        "cv_std": 0.0355,
+        "cv_folds": 5,
+        "overfit_gap": 0.0684,
+        "overfit_penalty": 0.0,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "l1_ratio": 0.7,
+          "alpha": 0.01
+        }
+      },
+      "params": {
+        "l1_ratio": 0.7,
+        "alpha": 0.01
+      }
+    },
+    {
+      "model_name": "ridge",
+      "score": 0.8664,
+      "metrics": {
+        "r2_score": 0.9342,
+        "test_r2": 0.9057,
+        "train_r2": 0.9573,
+        "rmse": 6939.8914,
+        "mae": 5973.8925,
+        "cv_std": 0.0362,
+        "cv_folds": 5,
+        "overfit_gap": 0.0516,
+        "overfit_penalty": 0.0,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "alpha": 1.0
+        }
+      },
+      "params": {
+        "alpha": 1.0
+      }
+    },
+    {
+      "model_name": "lasso",
+      "score": 0.8655,
+      "metrics": {
+        "r2_score": 0.9447,
+        "test_r2": 0.8928,
+        "train_r2": 0.9665,
+        "rmse": 7401.5199,
+        "mae": 6490.8619,
+        "cv_std": 0.0373,
+        "cv_folds": 5,
+        "overfit_gap": 0.0737,
+        "overfit_penalty": 0.0,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "alpha": 10.0
+        }
+      },
+      "params": {
+        "alpha": 10.0
+      }
+    },
+    {
+      "model_name": "linear_regression",
+      "score": 0.8642,
+      "metrics": {
+        "r2_score": 0.9449,
+        "test_r2": 0.8914,
+        "train_r2": 0.9665,
+        "rmse": 7449.4361,
+        "mae": 6515.6819,
+        "cv_std": 0.0378,
+        "cv_folds": 5,
+        "overfit_gap": 0.0752,
+        "overfit_penalty": 0.0,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {}
+      },
+      "params": {}
+    },
+    {
+      "model_name": "gradient_boosting",
+      "score": 0.8418,
+      "metrics": {
+        "r2_score": 0.9482,
+        "test_r2": 0.8463,
+        "train_r2": 0.9995,
+        "rmse": 8860.8597,
+        "mae": 8231.1403,
+        "cv_std": 0.0218,
+        "cv_folds": 5,
+        "overfit_gap": 0.1532,
+        "overfit_penalty": 0.0426,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "subsample": 0.6,
+          "n_estimators": 100,
+          "min_samples_leaf": 1,
+          "max_depth": 5,
+          "learning_rate": 0.05
+        }
+      },
+      "params": {
+        "subsample": 0.6,
+        "n_estimators": 100,
+        "min_samples_leaf": 1,
+        "max_depth": 5,
+        "learning_rate": 0.05
+      }
+    },
+    {
+      "model_name": "decision_tree",
+      "score": 0.3897,
+      "metrics": {
+        "r2_score": 0.7663,
+        "test_r2": 0.6358,
+        "train_r2": 0.966,
+        "rmse": 13639.4137,
+        "mae": 10548.3185,
+        "cv_std": 0.1368,
+        "cv_folds": 5,
+        "overfit_gap": 0.3302,
+        "overfit_penalty": 0.1842,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "min_samples_split": 10,
+          "min_samples_leaf": 5,
+          "max_depth": 6,
+          "ccp_alpha": 0.005
+        }
+      },
+      "params": {
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_depth": 6,
+        "ccp_alpha": 0.005
+      }
+    },
+    {
+      "model_name": "svm",
+      "score": -0.8171,
+      "metrics": {
+        "r2_score": -0.2296,
+        "test_r2": -0.8194,
+        "train_r2": -0.1488,
+        "rmse": 30485.1255,
+        "mae": 22451.5822,
+        "cv_std": 0.1969,
+        "cv_folds": 5,
+        "overfit_gap": 0.6706,
+        "overfit_penalty": 0.4565,
+        "test_set_size": 6,
+        "train_set_size": 24,
+        "best_params": {
+          "kernel": "poly",
+          "gamma": "auto",
+          "C": 10.0
+        }
+      },
+      "params": {
+        "kernel": "poly",
+        "gamma": "auto",
+        "C": 10.0
+      }
+    },
+    {
+      "model_name": "xgboost",
+      "score": -999.0,
+      "metrics": {},
+      "params": {}
+    }
+  ],
+  "preprocessing_report": {
+    "original_shape": [
+      30,
+      2
+    ],
+    "final_shape": [
+      30,
+      2
+    ],
+    "dropped_missing": [],
+    "dropped_variance": [],
+    "outliers_capped": {},
+    "encoded_cols": [],
+    "coerced_cols": [],
+    "remaining_nulls": 0
+  },
+  "agent_logs": [
+    "EDA Agent: regression task, 30 samples, 4 plots",
+    "Preprocessing: 30x2 -> 30x2 | dropped 0 cols | capped 0 outliers | 0 nulls remaining",
+    "Feature Engineering Agent: Selected 2 features",
+    "Parallel Evaluation: 10 models \u2014 knn=0.9221 | random_forest=0.8860 | elastic_net=0.8707 | ridge=0.8664 | lasso=0.8655 | linear_regression=0.8642 | gradient_boosting=0.8418 | decision_tree=0.3897 | svm=-0.8171 | xgboost=-999.0000",
+    "Best: knn (0.9221)"
+  ]
+}

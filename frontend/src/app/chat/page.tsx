@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { useChat } from '@/hooks/useApi'
+import { useStoredDataset } from '@/hooks/useStoredDataset'
 import { Send, Sparkles, BarChart2, Brain, Zap, Database } from 'lucide-react'
 import { PulseLoader } from '@/components/loaders/LoadingAnimations'
 
@@ -18,10 +19,10 @@ interface Message {
 
 const SUGGESTED = [
   { icon: Database,  text: 'What is this dataset about?' },
+  { icon: Brain,     text: 'What features are most important?' },
   { icon: BarChart2, text: 'Show distribution of target column' },
-  { icon: Sparkles,  text: 'Scatter plot of features vs target' },
-  { icon: Brain,     text: 'What are the feature correlations?' },
-  { icon: Zap,       text: 'Show a comparison bar chart' },
+  { icon: Sparkles,  text: 'Show correlation heatmap' },
+  { icon: Zap,       text: 'Are there any missing values?' },
 ]
 
 // ── Floating 3-D orb ──────────────────────────────────────────────────────────
@@ -122,21 +123,55 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
   )
 }
 
+// Decode HTML entities that occasionally leak from the LLM response
+function decodeEntities(str: string): string {
+  if (typeof document === 'undefined') return str
+  const txt = document.createElement('textarea')
+  txt.innerHTML = str
+  return txt.value
+}
+
+// Safe Plotly wrapper — catches render errors so a bad chart never crashes the chat
+function SafePlot({ chart }: { chart: Record<string, unknown> }) {
+  const [error, setError] = useState<string | null>(null)
+  if (error) {
+    return (
+      <div className="px-4 py-6 text-center text-sm text-gray-500">
+        Chart could not be rendered. The data may be in an unexpected format.
+      </div>
+    )
+  }
+  const data   = (chart.data   as any[]) ?? []
+  const layout = (chart.layout as Record<string, unknown>) ?? {}
+  if (!data.length) return null
+  return (
+    <Plot
+      data={data}
+      layout={{
+        ...layout,
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor:  'rgba(0,0,0,0)',
+        font: { color: '#cbd5e1', size: 11, family: 'Inter, sans-serif' },
+        margin: { t: 32, r: 16, b: 48, l: 52 },
+        autosize: true,
+        xaxis: { ...(layout.xaxis as any), gridcolor: 'rgba(139,92,246,0.1)', zerolinecolor: 'rgba(139,92,246,0.2)' },
+        yaxis: { ...(layout.yaxis as any), gridcolor: 'rgba(139,92,246,0.1)', zerolinecolor: 'rgba(139,92,246,0.2)' },
+      }}
+      config={{ displayModeBar: true, responsive: true, displaylogo: false }}
+      style={{ width: '100%', minHeight: 340 }}
+      useResizeHandler
+      onError={() => setError('render error')}
+    />
+  )
+}
+
 export default function ChatPage() {
-  const [mounted, setMounted] = useState(false)
-  const [datasetId, setDatasetId] = useState<string | null>(null)
-  const [datasetInfo, setDatasetInfo] = useState<{ filename: string; column_names?: string[] } | null>(null)
+  const { dataset: datasetInfo, datasetId, mounted } = useStoredDataset()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isThinking, setIsThinking] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatMutation = useChat()
-
-  useEffect(() => {
-    const stored = localStorage.getItem('currentDataset')
-    if (stored) { const p = JSON.parse(stored); setDatasetId(p.dataset_id); setDatasetInfo(p) }
-    setMounted(true)
-  }, [])
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isThinking])
 
@@ -147,7 +182,12 @@ export default function ChatPage() {
     setIsThinking(true)
     try {
       const res = await chatMutation.mutateAsync({ datasetId, question })
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: res.answer, chart: res.chart ?? null }])
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: decodeEntities(res.answer ?? ''),
+        chart: res.chart ?? null,
+      }])
     } catch {
       setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: 'Something went wrong. Please try again.', chart: null }])
     } finally {
@@ -302,7 +342,7 @@ export default function ChatPage() {
                         backdropFilter: 'blur(20px)',
                       }}
                     >
-                      {msg.content}
+                      {decodeEntities(msg.content)}
                     </div>
                   </TiltCard>
 
@@ -331,22 +371,7 @@ export default function ChatPage() {
                         <motion.div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400"
                           animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 2, repeat: Infinity }} />
                       </div>
-                      <Plot
-                        data={(msg.chart as any).data ?? []}
-                        layout={{
-                          ...(msg.chart as any).layout,
-                          paper_bgcolor: 'rgba(0,0,0,0)',
-                          plot_bgcolor: 'rgba(0,0,0,0)',
-                          font: { color: '#cbd5e1', size: 11, family: 'Inter, sans-serif' },
-                          margin: { t: 32, r: 16, b: 48, l: 52 },
-                          autosize: true,
-                          xaxis: { ...(msg.chart as any).layout?.xaxis, gridcolor: 'rgba(139,92,246,0.1)', zerolinecolor: 'rgba(139,92,246,0.2)' },
-                          yaxis: { ...(msg.chart as any).layout?.yaxis, gridcolor: 'rgba(139,92,246,0.1)', zerolinecolor: 'rgba(139,92,246,0.2)' },
-                        }}
-                        config={{ displayModeBar: true, responsive: true, displaylogo: false }}
-                        style={{ width: '100%', minHeight: 340 }}
-                        useResizeHandler
-                      />
+                      <SafePlot chart={msg.chart as Record<string, unknown>} />
                     </motion.div>
                   )}
                 </div>

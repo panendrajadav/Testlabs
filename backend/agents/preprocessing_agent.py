@@ -1,137 +1,213 @@
-from typing import Dict, Any
-from concurrent.futures import ThreadPoolExecutor
-from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import ChatPromptTemplate
+from typing import Dict, Any, List, Tuple
 from graph.state import AutoMLState
 from utils.logger import logger
-from utils.helpers import llm_invoke_with_retry
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.impute import SimpleImputer
-from imblearn.over_sampling import SMOTE
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.preprocessing import OrdinalEncoder, LabelEncoder
+import pandas as pd
 import polars as pl
 import numpy as np
-import os
 
-def create_llm(config: Dict[str, Any]):
-    if config["llm"]["provider"] == "azure":
-        return AzureChatOpenAI(
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version="2024-05-01-preview",
-            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", "grok-4-1-fast-reasoning"),
-            temperature=config["llm"]["temperature"]
-        )
-    elif config["llm"]["provider"] == "openai":
-        return ChatOpenAI(model=config["llm"]["model"], temperature=config["llm"]["temperature"])
-    else:
-        return ChatAnthropic(model=config["llm"]["model"], temperature=config["llm"]["temperature"])
+# ── Constants ─────────────────────────────────────────────────────────────────
+_MISSING_DROP_THRESHOLD  = 0.50   # drop column if >50% values missing
+_VARIANCE_THRESHOLD      = 1e-6   # drop column if variance near zero (constant)
+_HIGH_CARDINALITY_LIMIT  = 50     # treat categorical as high-cardinality above this
+_KNN_NEIGHBORS           = 5      # KNN imputer neighbours
+_IQR_MULTIPLIER          = 1.5    # Winsorize fence: Q1 - k*IQR, Q3 + k*IQR
 
-def _impute_numeric(X, numeric_cols):
-    if numeric_cols and X[numeric_cols].isnull().any().any():
-        imputer = SimpleImputer(strategy='median')
-        X[numeric_cols] = imputer.fit_transform(X[numeric_cols])
+
+# ── Step 1: Drop columns with too many missing values ─────────────────────────
+def _drop_high_missing(X: pd.DataFrame, threshold: float) -> Tuple[pd.DataFrame, List[str]]:
+    missing_frac = X.isnull().mean()
+    drop_cols = missing_frac[missing_frac > threshold].index.tolist()
+    if drop_cols:
+        X = X.drop(columns=drop_cols)
+        logger.info(f"Dropped {len(drop_cols)} high-missing columns (>{threshold*100:.0f}%): {drop_cols}")
+    return X, drop_cols
+
+
+# ── Step 2: Drop zero-variance / near-constant columns ────────────────────────
+def _drop_zero_variance(X: pd.DataFrame, threshold: float) -> Tuple[pd.DataFrame, List[str]]:
+    num_cols = X.select_dtypes(include=[np.number]).columns
+    variances = X[num_cols].var()
+    drop_cols = variances[variances <= threshold].index.tolist()
+    # Also drop columns where a single value covers >99% of rows
+    for col in X.columns:
+        if col not in drop_cols:
+            top_freq = X[col].value_counts(normalize=True).iloc[0] if X[col].nunique() > 0 else 1.0
+            if top_freq >= 0.99:
+                drop_cols.append(col)
+    drop_cols = list(set(drop_cols))
+    if drop_cols:
+        X = X.drop(columns=drop_cols)
+        logger.info(f"Dropped {len(drop_cols)} zero-variance/near-constant columns: {drop_cols}")
+    return X, drop_cols
+
+
+# ── Step 3: Impute missing values ─────────────────────────────────────────────
+def _impute(X: pd.DataFrame, numeric_cols: List[str], categorical_cols: List[str]) -> pd.DataFrame:
+    num_present = [c for c in numeric_cols if c in X.columns]
+    cat_present = [c for c in categorical_cols if c in X.columns]
+
+    # Categorical: simple most_frequent (KNN doesn't work on strings)
+    if cat_present and X[cat_present].isnull().any().any():
+        si = SimpleImputer(strategy="most_frequent")
+        X[cat_present] = si.fit_transform(X[cat_present])
+        logger.info(f"Imputed {len(cat_present)} categorical columns (most_frequent)")
+
+    # Numeric: KNN imputer — uses feature correlations, better than median
+    if num_present and X[num_present].isnull().any().any():
+        n_neighbors = min(_KNN_NEIGHBORS, max(1, len(X) // 10))
+        knn = KNNImputer(n_neighbors=n_neighbors)
+        X[num_present] = knn.fit_transform(X[num_present])
+        missing_count = X[num_present].isnull().sum().sum()
+        logger.info(f"KNN-imputed {len(num_present)} numeric columns (k={n_neighbors}), remaining nulls: {missing_count}")
+
     return X
 
-def _impute_and_encode_categorical(X, categorical_cols):
-    if not categorical_cols:
-        return X
-    if X[categorical_cols].isnull().any().any():
-        imputer = SimpleImputer(strategy='most_frequent')
-        X[categorical_cols] = imputer.fit_transform(X[categorical_cols])
-    for col in categorical_cols:
-        le = LabelEncoder()
-        X[col] = le.fit_transform(X[col].astype(str))
-    return X
 
+# ── Step 4: Outlier capping (Winsorize) ───────────────────────────────────────
+def _cap_outliers(X: pd.DataFrame, numeric_cols: List[str]) -> Tuple[pd.DataFrame, Dict[str, int]]:
+    num_present = [c for c in numeric_cols if c in X.columns]
+    report: Dict[str, int] = {}
+    for col in num_present:
+        q1 = X[col].quantile(0.25)
+        q3 = X[col].quantile(0.75)
+        iqr = q3 - q1
+        if iqr == 0:
+            continue
+        lower = q1 - _IQR_MULTIPLIER * iqr
+        upper = q3 + _IQR_MULTIPLIER * iqr
+        n_outliers = int(((X[col] < lower) | (X[col] > upper)).sum())
+        if n_outliers > 0:
+            X[col] = X[col].clip(lower=lower, upper=upper)
+            report[col] = n_outliers
+    if report:
+        total = sum(report.values())
+        logger.info(f"Winsorized {total} outlier values across {len(report)} columns: {list(report.keys())}")
+    return X, report
+
+
+# ── Step 5: Encode categorical features ───────────────────────────────────────
+def _encode_categoricals(X: pd.DataFrame, categorical_cols: List[str]) -> Tuple[pd.DataFrame, List[str]]:
+    cat_present = [c for c in categorical_cols if c in X.columns]
+    encoded = []
+    for col in cat_present:
+        n_unique = X[col].nunique()
+        if n_unique > _HIGH_CARDINALITY_LIMIT:
+            # High cardinality: frequency encode (rank by count, preserves signal)
+            freq_map = X[col].value_counts().to_dict()
+            X[col] = X[col].map(freq_map).fillna(0).astype(int)
+            logger.info(f"Frequency-encoded high-cardinality column '{col}' ({n_unique} unique)")
+        else:
+            # Low/medium cardinality: ordinal encode (handles unseen values gracefully)
+            enc = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
+            X[col] = enc.fit_transform(X[[col]]).astype(int)
+        encoded.append(col)
+    return X, encoded
+
+
+# ── Step 6: Final type coercion — ensure all columns are numeric ───────────────
+def _coerce_to_numeric(X: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+    coerced = []
+    for col in X.columns:
+        if not pd.api.types.is_numeric_dtype(X[col]):
+            X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0)
+            coerced.append(col)
+    if coerced:
+        logger.info(f"Force-coerced {len(coerced)} remaining non-numeric columns: {coerced}")
+    return X, coerced
+
+
+# ── Main agent ────────────────────────────────────────────────────────────────
 def preprocessing_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
     logger.info("=== Preprocessing Agent Started ===")
 
     df = state["raw_data"].clone()
     target_col = state["target_column"]
     eda = state["eda_summary"]
-    numeric_cols = eda["numeric_cols"]
-    categorical_cols = eda["categorical_cols"]
+    numeric_cols: List[str] = eda["numeric_cols"]
+    categorical_cols: List[str] = eda["categorical_cols"]
 
-    # Skip LLM for small datasets
-    if df.height < 500:
-        llm_decision = "median imputation, scaling yes, label encoding"
-        logger.info("Small dataset - using default preprocessing strategy")
-    else:
-        llm = create_llm(config)
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert ML engineer deciding preprocessing strategy."),
-            ("user", """Based on this EDA summary, decide preprocessing steps:
-
-Missing values: {missing_values}
-Outliers: {outliers}
-Task type: {task_type}
-Class balance: {class_balance}
-
-Respond with a JSON-like decision:
-- imputation_strategy: mean/median/mode
-- scaling: yes/no
-- handle_imbalance: yes/no
-- encoding: label/onehot
-
-Keep it brief, just the decisions.""")
-        ])
-        response = llm_invoke_with_retry(llm, prompt.format_messages(
-            missing_values=eda.get("missing_values", {}),
-            outliers=eda.get("outliers", {}),
-            task_type=eda["task_type"],
-            class_balance=eda.get("class_balance", {})
-        ))
-        llm_decision = response.content
-    logger.info(f"Preprocessing Decision: {llm_decision}")
-
-    # Convert to pandas for sklearn
     df_pd = df.to_pandas()
+
+    # Drop rows where target is NaN — cannot impute the label
+    n_before = len(df_pd)
+    df_pd = df_pd.dropna(subset=[target_col]).reset_index(drop=True)
+    n_dropped = n_before - len(df_pd)
+    if n_dropped > 0:
+        logger.info(f"Dropped {n_dropped} rows with NaN target ('{target_col}')")
+
     X = df_pd.drop(columns=[target_col])
     y = df_pd[target_col]
 
-    # Run numeric imputation and categorical imputation+encoding in parallel
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        num_future = executor.submit(_impute_numeric, X.copy(), numeric_cols)
-        cat_future = executor.submit(_impute_and_encode_categorical, X.copy(), categorical_cols)
-        X_num = num_future.result()
-        X_cat = cat_future.result()
+    original_shape = X.shape
+    logger.info(f"Raw input: {original_shape[0]} rows x {original_shape[1]} cols")
 
-    # Merge results back
-    if numeric_cols:
-        X[numeric_cols] = X_num[numeric_cols]
-    if categorical_cols:
-        X[categorical_cols] = X_cat[categorical_cols]
+    # ── 1. Drop high-missing columns ──────────────────────────────────────────
+    X, dropped_missing = _drop_high_missing(X, _MISSING_DROP_THRESHOLD)
 
-    # Encode target if classification
-    if state["task_type"] == "classification" and y.dtype == 'object':
+    # Sync column lists after drops
+    numeric_cols    = [c for c in numeric_cols    if c in X.columns]
+    categorical_cols = [c for c in categorical_cols if c in X.columns]
+
+    # ── 2. Drop zero-variance / near-constant columns ─────────────────────────
+    X, dropped_variance = _drop_zero_variance(X, _VARIANCE_THRESHOLD)
+    numeric_cols    = [c for c in numeric_cols    if c in X.columns]
+    categorical_cols = [c for c in categorical_cols if c in X.columns]
+
+    # ── 3. Impute missing values ───────────────────────────────────────────────
+    X = _impute(X, numeric_cols, categorical_cols)
+
+    # ── 4. Cap outliers (Winsorize) ────────────────────────────────────────────
+    X, outlier_report = _cap_outliers(X, numeric_cols)
+
+    # ── 5. Encode categorical features ────────────────────────────────────────
+    X, encoded_cols = _encode_categoricals(X, categorical_cols)
+
+    # ── 6. Encode target label ────────────────────────────────────────────────
+    if state["task_type"] == "classification" and y.dtype == object:
         le = LabelEncoder()
-        y = le.fit_transform(y)
-        logger.info("Encoded target variable")
+        y = pd.Series(le.fit_transform(y), name=target_col)
+        logger.info(f"Target label encoded: {list(le.classes_)}")
 
-    # Scale numeric features
-    if numeric_cols:
-        scaler = StandardScaler()
-        X[numeric_cols] = scaler.fit_transform(X[numeric_cols])
-        logger.info("Applied standard scaling to numeric features")
+    # ── 7. Final coercion — guarantee all numeric ──────────────────────────────
+    X, coerced_cols = _coerce_to_numeric(X)
 
-    # Handle class imbalance
-    if state["task_type"] == "classification" and eda.get("class_balance"):
-        class_counts = list(eda["class_balance"].values())
-        if len(class_counts) > 1 and max(class_counts) / min(class_counts) > 3:
-            try:
-                smote = SMOTE(random_state=42, n_jobs=-1)
-                X, y = smote.fit_resample(X, y)
-                logger.info(f"Applied SMOTE: {len(X)} samples after resampling")
-            except:
-                logger.warning("SMOTE failed, skipping class balancing")
-
-    X[target_col] = y
+    # ── 8. Assemble processed dataframe ───────────────────────────────────────
+    X[target_col] = y.values
     processed_df = pl.from_pandas(X)
 
-    state["processed_data"] = processed_df
-    state["preprocessing_config"] = {"llm_decision": llm_decision}
-    state["agent_logs"].append(f"Preprocessing Agent: Processed {processed_df.height} samples")
+    # ── Summary ───────────────────────────────────────────────────────────────
+    final_shape = (processed_df.height, processed_df.width - 1)  # exclude target
+    remaining_nulls = X.drop(columns=[target_col]).isnull().sum().sum()
+
+    preprocessing_report = {
+        "original_shape":    list(original_shape),
+        "final_shape":       list(final_shape),
+        "dropped_missing":   dropped_missing,
+        "dropped_variance":  dropped_variance,
+        "outliers_capped":   outlier_report,
+        "encoded_cols":      encoded_cols,
+        "coerced_cols":      coerced_cols,
+        "remaining_nulls":   int(remaining_nulls),
+    }
+
+    logger.info(
+        f"Preprocessing complete: {original_shape} -> {final_shape} | "
+        f"dropped={len(dropped_missing)+len(dropped_variance)} cols | "
+        f"outliers capped={sum(outlier_report.values())} | "
+        f"nulls remaining={remaining_nulls}"
+    )
+
+    state["processed_data"]       = processed_df
+    state["preprocessing_config"] = preprocessing_report
+    state["agent_logs"].append(
+        f"Preprocessing: {original_shape[0]}x{original_shape[1]} -> "
+        f"{final_shape[0]}x{final_shape[1]} | "
+        f"dropped {len(dropped_missing)+len(dropped_variance)} cols | "
+        f"capped {sum(outlier_report.values())} outliers | "
+        f"{remaining_nulls} nulls remaining"
+    )
 
     logger.info("=== Preprocessing Agent Completed ===")
     return state

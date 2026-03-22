@@ -1,0 +1,92 @@
+{
+  "baseline_version": "v5",
+  "n_rows": 768,
+  "feature_stats": {
+    "Pregnancies": {
+      "mean": 3.83724,
+      "std": 3.344157,
+      "min": 0.0,
+      "max": 13.5,
+      "p25": 1.0,
+      "p50": 3.0,
+      "p75": 6.0,
+      "null_rate": 0.0
+    },
+    "Glucose": {
+      "mean": 121.13623,
+      "std": 31.187468,
+      "min": 37.125,
+      "max": 199.0,
+      "p25": 99.0,
+      "p50": 117.0,
+      "p75": 140.25,
+      "null_rate": 0.0
+    },
+    "BloodPressure": {
+      "mean": 70.684896,
+      "std": 14.197239,
+      "min": 35.0,
+      "max": 107.0,
+      "p25": 62.0,
+      "p50": 72.0,
+      "p75": 80.0,
+      "null_rate": 0.0
+    },
+    "SkinThickness": {
+      "mean": 20.511719,
+      "std": 15.844744,
+      "min": 0.0,
+      "max": 80.0,
+      "p25": 0.0,
+      "p50": 23.0,
+      "p75": 32.0,
+      "null_rate": 0.0
+    },
+    "Insulin": {
+      "mean": 73.652669,
+      "std": 93.576029,
+      "min": 0.0,
+      "max": 318.125,
+      "p25": 0.0,
+      "p50": 30.5,
+      "p75": 127.25,
+      "null_rate": 0.0
+    },
+    "BMI": {
+      "mean": 32.125065,
+      "std": 7.049584,
+      "min": 13.35,
+      "max": 50.55,
+      "p25": 27.3,
+      "p50": 32.0,
+      "p75": 36.6,
+      "null_rate": 0.0
+    },
+    "DiabetesPedigreeFunction": {
+      "mean": 0.458914,
+      "std": 0.285596,
+      "min": 0.078,
+      "max": 1.2,
+      "p25": 0.24375,
+      "p50": 0.3725,
+      "p75": 0.62625,
+      "null_rate": 0.0
+    },
+    "Age": {
+      "mean": 33.19987,
+      "std": 11.628404,
+      "min": 21.0,
+      "max": 66.5,
+      "p25": 24.0,
+      "p50": 29.0,
+      "p75": 41.0,
+      "null_rate": 0.0
+    }
+  },
+  "drift_thresholds": {
+    "mean_shift_z": 2.0,
+    "std_ratio": 1.5,
+    "null_rate_delta": 0.05
+  },
+  "note": "Compare incoming batch stats against feature_stats to detect drift."
+}

@@ -22,50 +22,78 @@ def _create_llm():
         temperature=0.1
     )
 
-_SYSTEM_PROMPT = """You are an expert data analyst AI. You have a pandas DataFrame called `df`.
+_SYSTEM_PROMPT = """You are a dataset analyst AI. You have a pandas DataFrame called `df` loaded from the user's dataset.
 
-Your job is to answer the user's question by writing Python code that sets two variables:
-  - `answer` : a clean, human-friendly string (NO raw Python repr, NO HTML entities, NO angle brackets)
+Write Python code that sets:
+  - `answer` : a plain-text string with findings FROM the actual data (use real column names, real numbers, real stats)
   - `chart`  : a plotly figure dict (fig.to_dict()) OR None
 
-RULES — follow exactly:
-1. Output ONLY raw executable Python. No markdown fences, no prose outside code.
+CRITICAL RULES:
+1. Output ONLY raw executable Python. No markdown fences, no prose.
 2. Always set BOTH `answer` and `chart`.
-3. Use only: pandas (as pd), plotly.express (as px), plotly.graph_objects (as go), numpy (as np).
+3. Use only: pandas (pd), plotly.express (px), plotly.graph_objects (go), numpy (np).
 4. Never call fig.show(). Never use matplotlib or seaborn.
-5. For `answer`, build a plain English string. Example:
-     answer = f"The dataset has {{len(df)}} rows and {{len(df.columns)}} columns."
-   NOT: answer = str(df.columns.tolist())   ← this produces ugly repr
-6. If the user asks to compare/plot specific columns, use exactly those column names from df.columns.
-7. If a visualization is NOT possible (e.g. text data, single value, non-numeric), set chart = None
-   and set answer to explain clearly why it cannot be visualised and what you found instead.
-8. For correlation/comparison questions, always try to produce a chart.
-9. Make charts visually rich: use color_discrete_sequence or color_continuous_scale where appropriate.
-10. Column names: use df.columns to find the right column — do NOT guess or hardcode names.
+5. `answer` must be plain text - NO HTML entities, NO angle brackets. Write "less than 0.7" not "< 0.7".
+6. When a chart is produced, set answer to ONE short sentence describing what it shows.
+7. Use df.columns to find column names - never hardcode or guess.
+8. Only redirect if the question is completely unrelated to data/ML/statistics (e.g. "write me a poem").
+   For those only, set: answer = "I can only analyse your dataset." and chart = None.
 
-QUESTION TYPES:
-- "what is this data about" / "describe" → summarise columns, dtypes, shape, sample values in answer. chart = None.
-- "show distribution" → histogram with px.histogram. chart = fig.to_dict().
-- "compare X and Y" / "relationship between X and Y" → scatter plot px.scatter. chart = fig.to_dict().
-- "correlation" → heatmap using go.Heatmap on df.select_dtypes(include='number').corr(). chart = fig.to_dict().
-- "bar chart" / "count" → px.bar or px.pie. chart = fig.to_dict().
-- "summary statistics" → df.describe() formatted as readable string. chart = None.
-- anything else → answer the question analytically in plain English."""
+QUESTION TYPES - handle ALL of these with real data:
+
+- overview / describe / what is this dataset about / summary:
+    rows = len(df)
+    cols = len(df.columns)
+    col_list = ", ".join(df.columns.tolist())
+    num_summary = df.describe().to_string()
+    answer = "This dataset has " + str(rows) + " rows and " + str(cols) + " columns. Columns: " + col_list + ". Numeric summary: " + num_summary
+    chart = None
+
+- feature importance / which features matter / important columns:
+    num_df = df.select_dtypes(include='number')
+    target = num_df.columns[-1]
+    corr = num_df.corr()[target].drop(target).abs().sort_values(ascending=True)
+    fig = px.bar(x=corr.values.tolist(), y=corr.index.tolist(), orientation='h', title='Feature Importance (correlation with ' + target + ')')
+    chart = fig.to_dict()
+    top3 = corr.sort_values(ascending=False).head(3).index.tolist()
+    answer = "Top features correlated with " + target + ": " + ", ".join(top3)
+
+- distribution of X: px.histogram(df, x=col, title='Distribution of ' + col). chart = fig.to_dict().
+- scatter X vs Y: px.scatter(df, x=col1, y=col2). chart = fig.to_dict().
+- correlation / heatmap: go.Heatmap on df.select_dtypes('number').corr(). chart = fig.to_dict().
+- missing values / nulls: count nulls per column, bar chart of columns with nulls.
+- bar / count / value counts: px.bar or px.pie on value_counts().
+- stats / describe: df.describe() as readable string. chart = None.
+- top N / highest / lowest: sort and show relevant rows/columns.
+- outliers: use IQR on numeric columns, report count and show box plot.
+- any other data question: write code to answer it from df directly."""
 
 CHAT_PROMPT = ChatPromptTemplate.from_messages([
     ("system", _SYSTEM_PROMPT),
-    ("user", "DataFrame info:\nColumns: {columns}\nDtypes:\n{schema}\nShape: {shape}\nSample (first 3 rows):\n{sample}\n\nUser question: {question}\n\nPython code only:")
+    ("user", "DataFrame info:\nColumns: {columns}\nDtypes:\n{schema}\nShape: {shape}\nSample (first 5 rows):\n{sample}\n\nUser question: {question}\n\nPython code only:")
 ])
 
 def _clean_answer(raw: str) -> str:
-    """Strip Python repr artifacts and HTML entities from answer strings."""
-    # HTML entities
-    raw = raw.replace("&#39;", "'").replace("&quot;", '"').replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    # Strip wrapping quotes that come from str(list(...))
+    """Decode HTML entities, strip repr artifacts, remove chart-description boilerplate."""
+    import html
+    # Decode all HTML entities (&amp; &#39; &quot; &#x27; etc.) in one pass
+    raw = html.unescape(raw)
     raw = raw.strip()
-    if (raw.startswith("'") and raw.endswith("'")) or (raw.startswith('"') and raw.endswith('"')):
-        raw = raw[1:-1]
-    return raw.strip()
+    # Strip wrapping quotes from str(list(...)) or str(value)
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ("'", '"'):
+        raw = raw[1:-1].strip()
+    # Remove boilerplate chart-description sentences the LLM sometimes adds
+    # e.g. "Here is the scatter plot showing..." when a chart is already returned
+    boilerplate = (
+        r"^here is (the |a |an )?\w[^.]*plot[^.]*\.\s*",
+        r"^here is (the |a |an )?\w[^.]*chart[^.]*\.\s*",
+        r"^here is (the |a |an )?\w[^.]*graph[^.]*\.\s*",
+        r"^the (scatter|bar|line|pie|histogram|heatmap) plot[^.]*\.\s*",
+    )
+    import re as _re
+    for pat in boilerplate:
+        raw = _re.sub(pat, "", raw, flags=_re.IGNORECASE).strip()
+    return raw or "Done."
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_analyst(request: ChatRequest):
@@ -73,12 +101,23 @@ async def chat_analyst(request: ChatRequest):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Dataset not found. Upload first.")
 
-    df = pl.read_csv(file_path).to_pandas()
+    df = pl.read_csv(
+        file_path,
+        null_values=["NA", "N/A", "na", "n/a", "null", "NULL", "None", "none", "", "?"],
+        infer_schema_length=10000,
+        ignore_errors=True,
+    ).to_pandas()
 
     columns   = ", ".join(df.columns.tolist())
     schema    = "\n".join([f"  {col}: {dtype}" for col, dtype in zip(df.columns, df.dtypes)])
-    sample    = df.head(3).to_string(index=False)
+    sample    = df.head(5).to_string(index=False)
     shape     = f"{df.shape[0]} rows x {df.shape[1]} columns"
+    # Append numeric summary to sample so LLM has richer context
+    try:
+        num_summary = df.describe(include='number').to_string()
+        sample = sample + "\n\nNumeric summary:\n" + num_summary
+    except Exception:
+        pass
 
     llm = _create_llm()
     response = llm_invoke_with_retry(llm, CHAT_PROMPT.format_messages(
@@ -125,21 +164,24 @@ async def chat_analyst(request: ChatRequest):
 
     # Fallback answers
     if not answer:
-        if exec_error:
-            # Retry with a simpler direct LLM answer (no code)
+        if exec_error or raw_code == "":
+            # Retry with a direct prose prompt — no code execution
             try:
                 retry_prompt = ChatPromptTemplate.from_messages([
-                    ("system", "You are a data analyst. Answer the question in plain English based on the dataset info provided. Be concise and helpful."),
-                    ("user", f"Dataset columns: {columns}\nShape: {shape}\nSample:\n{sample}\n\nQuestion: {request.question}")
+                    ("system", (
+                        "You are a dataset analyst. Answer the user's question using ONLY the actual data provided below. "
+                        "Give concrete numbers, column names, and statistics from the data. "
+                        "For feature importance questions, rank columns by their absolute correlation with the last numeric column. "
+                        "For overview questions, describe what the dataset is about based on its column names and statistics. "
+                        "Plain text only — no HTML entities, no markdown."
+                    )),
+                    ("user", f"Dataset columns: {columns}\nShape: {shape}\nNumeric summary:\n{sample}\n\nQuestion: {request.question}")
                 ])
                 retry_resp = llm_invoke_with_retry(llm, retry_prompt.format_messages())
                 answer = retry_resp.content.strip()
                 chart  = None
             except Exception:
-                answer = f"I had trouble analysing that. The dataset has columns: {columns}. Please try rephrasing your question."
-        elif raw_code == "":
-            # LLM returned prose directly — use it
-            answer = raw
+                answer = f"Could not analyse the dataset. Try: show distribution of {df.columns[0]}, or scatter plot of X vs Y."
         else:
             answer = "Analysis complete."
 

@@ -2,9 +2,8 @@ export const PIPELINE_STAGES = [
   { id: 'eda', name: 'EDA', label: 'Exploratory Data Analysis' },
   { id: 'preprocessing', name: 'Preprocessing', label: 'Data Preprocessing' },
   { id: 'feature-engineering', name: 'Feature Engineering', label: 'Feature Engineering' },
-  { id: 'model-selection', name: 'Model Selection', label: 'Model Selection' },
-  { id: 'hpo', name: 'HPO', label: 'Hyperparameter Optimization' },
-  { id: 'evaluation', name: 'Evaluation', label: 'Model Evaluation' },
+  { id: 'training', name: 'Training Models', label: 'Training & Evaluation' },
+  { id: 'artifacts', name: 'Saving Artifacts', label: 'Saving Artifacts' },
 ]
 
 export const ANIMATION_DURATION = {

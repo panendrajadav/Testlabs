@@ -1,41 +1,105 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { usePipelineStatus } from '@/hooks/useApi'
+import { usePipelineStatus, usePipelineWebSocket } from '@/hooks/useApi'
+import { useStoredDataset, updateExperimentResult } from '@/hooks/useStoredDataset'
 import { containerVariants, itemVariants } from '@/animations/variants'
 import { PIPELINE_STAGES } from '@/utils/constants'
-import { CheckCircle, Clock, AlertCircle, Zap, ArrowRight } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, Zap, ArrowRight, Wifi, WifiOff } from 'lucide-react'
 import Pipeline3DVisualizer from '@/components/visualization/Pipeline3DVisualizer'
 import { PipelineLoadingAnimation } from '@/components/loaders/LoadingAnimations'
+import { apiService } from '@/services/api'
+import { fsSetArtifacts, type ArtifactPayload } from '@/services/firestoreService'
 import type { PipelineStatus } from '@/types'
 
 export default function PipelinePage() {
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
-  const [datasetId, setDatasetId] = useState<string | null>(null)
+  const { datasetId, mounted } = useStoredDataset()
 
-  useEffect(() => {
-    const stored = localStorage.getItem('currentDataset')
-    if (stored) setDatasetId(JSON.parse(stored).dataset_id)
-    setMounted(true)
-  }, [])
-
+  const wsConnected = usePipelineWebSocket(datasetId)
   const { data: job, isLoading } = usePipelineStatus(datasetId)
   const status = job as PipelineStatus | undefined
   const isRunning = status?.status === 'running' || status?.status === 'queued'
   const isDone = status?.status === 'completed'
   const isFailed = status?.status === 'failed'
 
+  // Patch experiment list when pipeline finishes
+  const artifactsSynced = useRef(false)
+  useEffect(() => {
+    if (isDone && datasetId && status?.result) {
+      updateExperimentResult(datasetId, {
+        best_model: status.result.best_model,
+        best_score: status.result.best_score,
+        task_type:  status.result.task_type,
+        status:     'completed',
+      })
+
+      // Push full artifacts to Firestore once per completion
+      if (!artifactsSynced.current) {
+        artifactsSynced.current = true
+        const version = status.result.artifact_version
+        if (version) {
+          apiService.getArtifactSummary(datasetId, version)
+            .then((summary) => {
+              const payload: ArtifactPayload = {
+                // Identity
+                version,
+                dataset_id:          datasetId,
+                // Best model
+                model_name:          status.result.best_model          ?? '',
+                task_type:           status.result.task_type           ?? '',
+                best_score:          status.result.best_score          ?? null,
+                best_params:         status.result.best_params         ?? {},
+                timestamp:           summary.metadata?.timestamp       ?? new Date().toISOString(),
+                training_time_s:     summary.metadata?.training_time_s ?? 0,
+                target_column:       status.result.target_column       ?? '',
+                selected_features:   status.result.selected_features   ?? [],
+                justification:       status.result.justification       ?? null,
+                is_underfit:         status.result.is_underfit         ?? false,
+                // All models — full metrics
+                evaluation_results:  status.result.evaluation_results  ?? [],
+                // Artifact file contents
+                metadata:            summary.metadata                  ?? null,
+                experiment_log:      summary.experiment                ?? null,
+                training_log:        summary.training_log              ?? null,
+                reproducibility:     summary.reproducibility           ?? null,
+                inference_samples:   summary.inference_samples         ?? null,
+                drift_hooks:         summary.drift_hooks               ?? null,
+                api_export_code:     summary.api_export_code           ?? null,
+                model_file_exists:   summary.model_file_exists         ?? false,
+                model_size_kb:       summary.model_size_kb             ?? null,
+                // Pipeline extras
+                agent_logs:          status.result.agent_logs          ?? [],
+                eda_summary:         status.result.eda_summary         ?? null,
+                shap_values:         status.result.shap_values         ?? null,
+                roc_data:            status.result.roc_data            ?? null,
+                preprocessing_report: status.result.preprocessing_report ?? null,
+              }
+              return fsSetArtifacts(datasetId, version, payload)
+            })
+            .catch(console.error)
+        }
+      }
+    } else if (isFailed && datasetId) {
+      updateExperimentResult(datasetId, { status: 'failed' })
+    }
+  }, [isDone, isFailed, datasetId])
+
+  const progressIdx = (isRunning || isFailed)
+    ? PIPELINE_STAGES.findIndex((p) => p.name === status?.progress)
+    : -1
+  // "Starting", "Queued", or any unknown string → treat as stage 0 running
+  const effectiveIdx = progressIdx >= 0 ? progressIdx : (isRunning ? 0 : -1)
+
   const vizStages = PIPELINE_STAGES.map((s, thisIdx) => {
-    const progressIdx = PIPELINE_STAGES.findIndex((p) => p.name === status?.progress)
     let stageStatus: 'pending' | 'running' | 'completed' | 'failed' = 'pending'
     if (isDone) stageStatus = 'completed'
-    else if (isFailed && thisIdx === progressIdx) stageStatus = 'failed'
-    else if (thisIdx < progressIdx) stageStatus = 'completed'
-    else if (thisIdx === progressIdx) stageStatus = 'running'
-    return { id: s.id, name: s.name, status: stageStatus, progress: stageStatus === 'running' ? 50 : 0 }
+    else if (isFailed && thisIdx === effectiveIdx) stageStatus = 'failed'
+    else if (effectiveIdx >= 0 && thisIdx < effectiveIdx) stageStatus = 'completed'
+    else if (effectiveIdx >= 0 && thisIdx === effectiveIdx) stageStatus = 'running'
+    return { id: s.id, name: s.label, status: stageStatus, progress: stageStatus === 'running' ? 50 : 0 }
   })
 
   if (!mounted) return null
@@ -63,39 +127,55 @@ export default function PipelinePage() {
         {/* Header */}
         <motion.div variants={itemVariants} className="mb-8">
           <h1 className="text-4xl font-bold text-gradient mb-2">ML Pipeline</h1>
-          <p className="text-gray-400">Real-time monitoring of your AutoML pipeline</p>
+          <p className="text-gray-400 flex items-center gap-2">
+            Real-time monitoring of your AutoML pipeline
+            {wsConnected
+              ? <span className="flex items-center gap-1 text-green-400 text-xs"><Wifi size={12} /> live</span>
+              : <span className="flex items-center gap-1 text-gray-500 text-xs"><WifiOff size={12} /> polling</span>
+            }
+          </p>
         </motion.div>
 
         {/* Status banner */}
-        {status && (
-          <motion.div variants={itemVariants}
-            className={`border rounded-lg p-4 mb-8 glass flex items-center gap-3 ${
-              isDone ? 'border-green-500/30 bg-green-500/10' :
-              isFailed ? 'border-red-500/30 bg-red-500/10' :
-              'border-purple-500/30 bg-purple-500/10'
-            }`}>
-            {isDone ? <CheckCircle className="text-green-400 shrink-0" size={20} /> :
-             isFailed ? <AlertCircle className="text-red-400 shrink-0" size={20} /> :
-             isRunning ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}><Zap className="text-blue-400" size={20} /></motion.div> :
-             <Clock className="text-gray-400 shrink-0" size={20} />}
-            <span className="text-white font-medium capitalize">{status.status}</span>
-            {status.progress && !isDone && (
-              <span className="text-gray-400 text-sm">— {status.progress}</span>
-            )}
-            {status.error && <span className="text-red-400 text-sm ml-2">{status.error}</span>}
+        <motion.div variants={itemVariants}
+          className={`border rounded-lg p-4 mb-8 glass flex items-center gap-3 ${
+            isDone    ? 'border-green-500/30 bg-green-500/10' :
+            isFailed  ? 'border-red-500/30 bg-red-500/10' :
+            isRunning ? 'border-purple-500/30 bg-purple-500/10' :
+                        'border-slate-700/50 bg-slate-900/30'
+          }`}>
+          {isDone   ? <CheckCircle className="text-green-400 shrink-0" size={20} /> :
+           isFailed ? <AlertCircle className="text-red-400 shrink-0" size={20} /> :
+           isRunning ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}><Zap className="text-blue-400" size={20} /></motion.div> :
+           <Clock className="text-gray-500 shrink-0" size={20} />}
 
-            {/* View Results button */}
-            {isDone && (
-              <motion.button
-                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                onClick={() => router.push('/models')}
-                className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-lg text-white text-sm font-medium glow"
-              >
-                View Results <ArrowRight size={16} />
-              </motion.button>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-white font-medium capitalize">
+              {isDone ? 'Pipeline Complete' :
+               isFailed ? 'Pipeline Failed' :
+               isRunning ? 'Running Pipeline' :
+               'Waiting to start — click Run Pipeline below'}
+            </span>
+            {isRunning && status?.progress && (
+              <span className="text-gray-400 text-xs">
+                Step {effectiveIdx + 1}/{PIPELINE_STAGES.length} — {PIPELINE_STAGES.find(s => s.name === status.progress)?.label ?? status.progress}
+              </span>
             )}
-          </motion.div>
-        )}
+            {isFailed && status?.error && (
+              <span className="text-red-400 text-xs truncate">{status.error}</span>
+            )}
+          </div>
+
+          {isDone && (
+            <motion.button
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              onClick={() => router.push('/models')}
+              className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-lg text-white text-sm font-medium glow shrink-0"
+            >
+              View Results <ArrowRight size={16} />
+            </motion.button>
+          )}
+        </motion.div>
 
         {/* Pipeline Visualizer */}
         <motion.div variants={itemVariants}

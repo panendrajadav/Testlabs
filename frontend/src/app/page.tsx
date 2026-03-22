@@ -1,19 +1,59 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowRight, Zap, TrendingUp, Database } from 'lucide-react'
 import NeuralNetworkBackground from '@/components/visualization/NeuralNetworkBackground'
 import Pipeline3DVisualizer from '@/components/visualization/Pipeline3DVisualizer'
 import { containerVariants, itemVariants } from '@/animations/variants'
 import { PIPELINE_STAGES } from '@/utils/constants'
+import { getAuth } from '@/hooks/useAuth'
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const [activeIdx, setActiveIdx] = useState(0)
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    let idx = 0
+    let prog = 0
+    let animating = true
+
+    const HOLD_MS = 200   // pause at 100% before moving on
+    const TICK_MS = 40     // interval speed
+    const STEP = 2         // progress increment per tick (~2s to fill)
+
+    const tick = setInterval(() => {
+      if (!animating) return
+      prog += STEP
+      if (prog <= 100) {
+        setProgress(prog)
+      } else {
+        // Hold at 100% for HOLD_MS then advance
+        animating = false
+        setTimeout(() => {
+          idx = (idx + 1) % PIPELINE_STAGES.length
+          prog = 0
+          setActiveIdx(idx)
+          setProgress(0)
+          animating = true
+        }, HOLD_MS)
+      }
+    }, TICK_MS)
+
+    return () => clearInterval(tick)
+  }, [])
+
   const mockPipelineStages = PIPELINE_STAGES.map((stage, i) => ({
     id: stage.id,
-    name: stage.name,
-    status: (i === 0 ? 'completed' : i === 1 ? 'running' : 'pending') as 'completed' | 'running' | 'pending' | 'failed',
-    progress: i === 1 ? 45 : 0,
+    name: stage.label,
+    status: (
+      i < activeIdx ? 'completed' :
+      i === activeIdx ? 'running' : 'pending'
+    ) as 'completed' | 'running' | 'pending' | 'failed',
+    progress: i === activeIdx ? progress : 0,
   }))
 
   return (
@@ -87,17 +127,16 @@ export default function DashboardPage() {
               variants={itemVariants}
               className="flex flex-col sm:flex-row gap-4 justify-center mb-20"
             >
-              <Link href="/upload">
-                <motion.button
+              <motion.button
                   whileHover={{ scale: 1.05, boxShadow: '0 0 50px rgba(139, 92, 246, 0.6)' }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => router.push(getAuth() ? '/upload' : '/login?redirect=/upload')}
                   className="px-8 py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-lg font-semibold text-white flex items-center gap-2 glow text-center justify-center"
                 >
                   <Zap size={20} />
-                  Upload Dataset
+                  Create Experiment
                   <ArrowRight size={20} />
                 </motion.button>
-              </Link>
 
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -164,7 +203,7 @@ export default function DashboardPage() {
               ML Pipeline Architecture
             </motion.h2>
             <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
-              Our intelligent system processes your data through 6 sophisticated stages,
+              Our intelligent system processes your data through {PIPELINE_STAGES.length} automated stages,
               delivering optimized machine learning models automatically.
             </p>
 
@@ -220,7 +259,7 @@ export default function DashboardPage() {
                 whileTap={{ scale: 0.95 }}
                 className="px-12 py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-lg font-semibold text-white flex items-center gap-2 glow mx-auto"
               >
-                Start Building <ArrowRight size={20} />
+              Start Experiment <ArrowRight size={20} />
               </motion.button>
             </Link>
           </div>

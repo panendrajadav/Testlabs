@@ -1,0 +1,7 @@
+dataset_id,version,timestamp,model_name,composite_score,cv_score,test_score,train_score,f1_score,roc_auc,rmse,mae,cv_std,overfit_gap,overfit_penalty,train_set_size,test_set_size,best_params
+unknown,v1,2026-03-22T03:42:06.773555+00:00,logistic_regression,0.5693,0.5313,0.5326,0.5951,0.5656,0.7942,,,0.0281,0.0625,0.0,736,184,"{""solver"": ""lbfgs"", ""C"": 10.0}"
+unknown,v1,2026-03-22T03:42:06.773555+00:00,decision_tree,0.5588,0.5422,0.5543,0.6223,0.5773,,,,0.0393,0.0679,0.0,736,184,"{""min_samples_split"": 5, ""min_samples_leaf"": 5, ""max_depth"": 5}"
+unknown,v1,2026-03-22T03:42:06.773555+00:00,knn,0.5408,0.511,0.5543,0.6576,0.5813,,,,0.0392,0.1033,0.0026,736,184,"{""weights"": ""uniform"", ""n_neighbors"": 11}"
+unknown,v1,2026-03-22T03:42:06.773555+00:00,gradient_boosting,0.4426,0.5952,0.5815,0.856,0.6088,,,,0.0449,0.2745,0.1396,736,184,"{""subsample"": 0.8, ""n_estimators"": 50, ""max_depth"": 4, ""learning_rate"": 0.05}"
+unknown,v1,2026-03-22T03:42:06.773555+00:00,random_forest,0.4204,0.6088,0.6087,0.9389,0.6214,,,,0.0412,0.3302,0.1842,736,184,"{""n_estimators"": 50, ""min_samples_leaf"": 3, ""max_depth"": null}"
+unknown,v1,2026-03-22T03:42:06.773555+00:00,svm,0.3282,0.5436,0.5543,0.9375,0.5568,,,,0.0417,0.3832,0.2266,736,184,"{""kernel"": ""rbf"", ""gamma"": ""scale"", ""C"": 10.0}"

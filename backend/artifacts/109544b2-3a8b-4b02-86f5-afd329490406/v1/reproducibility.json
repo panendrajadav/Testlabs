@@ -1,0 +1,52 @@
+{
+  "random_seed": 42,
+  "train_test_split": {
+    "test_size": 0.2,
+    "random_state": 42,
+    "stratify": false
+  },
+  "cv_strategy": {
+    "folds": 5,
+    "shuffle": true,
+    "random_state": 42
+  },
+  "hpo": {
+    "method": "RandomizedSearchCV",
+    "n_iter": 8,
+    "random_state": 42
+  },
+  "preprocessing_steps": [
+    "drop_high_missing (>50%)",
+    "drop_zero_variance",
+    "knn_imputation",
+    "iqr_winsorization",
+    "ordinal_encoding",
+    "type_coercion"
+  ],
+  "preprocessing_config": {
+    "original_shape": [
+      30,
+      2
+    ],
+    "final_shape": [
+      30,
+      2
+    ],
+    "dropped_missing": [],
+    "dropped_variance": [],
+    "outliers_capped": {},
+    "encoded_cols": [],
+    "coerced_cols": [],
+    "remaining_nulls": 0
+  },
+  "selected_features": [
+    "",
+    "YearsExperience"
+  ],
+  "target_column": "Salary",
+  "task_type": "regression",
+  "dataset_hash": "e6efb7373ed52ac1",
+  "framework": "scikit-learn",
+  "python_version": "3.13.1",
+  "sklearn_version": "1.8.0"
+}

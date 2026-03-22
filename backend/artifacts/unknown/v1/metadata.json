@@ -1,0 +1,26 @@
+{
+  "version": "v1",
+  "dataset_id": "unknown",
+  "dataset_hash": "0d49b39cd832249f",
+  "model_name": "logistic_regression",
+  "task_type": "classification",
+  "best_score": 0.5693,
+  "best_params": {
+    "solver": "lbfgs",
+    "C": 10.0
+  },
+  "timestamp": "2026-03-22T03:42:06.773555+00:00",
+  "training_time_s": 82.91,
+  "framework": "scikit-learn",
+  "format": "pkl",
+  "files": [
+    "best_model.pkl",
+    "reproducibility.json",
+    "inference_samples.json",
+    "api_export.py",
+    "training_log.csv",
+    "experiment_log.json",
+    "drift_hooks.json",
+    "metadata.json"
+  ]
+}

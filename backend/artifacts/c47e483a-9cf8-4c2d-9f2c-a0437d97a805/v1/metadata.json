@@ -1,0 +1,31 @@
+{
+  "version": "v1",
+  "dataset_id": "c47e483a-9cf8-4c2d-9f2c-a0437d97a805",
+  "dataset_hash": "5db7e1360a6e4b81",
+  "model_name": "xgboost",
+  "task_type": "classification",
+  "best_score": 0.7723,
+  "best_params": {
+    "subsample": 0.8,
+    "reg_lambda": 5.0,
+    "reg_alpha": 0.5,
+    "n_estimators": 300,
+    "max_depth": 3,
+    "learning_rate": 0.01,
+    "colsample_bytree": 0.6
+  },
+  "timestamp": "2026-03-22T12:37:33.504397+00:00",
+  "training_time_s": 70.56,
+  "framework": "scikit-learn",
+  "format": "pkl",
+  "files": [
+    "best_model.pkl",
+    "reproducibility.json",
+    "inference_samples.json",
+    "api_export.py",
+    "training_log.csv",
+    "experiment_log.json",
+    "drift_hooks.json",
+    "metadata.json"
+  ]
+}

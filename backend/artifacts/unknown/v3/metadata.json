@@ -1,0 +1,29 @@
+{
+  "version": "v3",
+  "dataset_id": "unknown",
+  "dataset_hash": "7b5f0a9903c76ae7",
+  "model_name": "random_forest",
+  "task_type": "regression",
+  "best_score": 0.5544,
+  "best_params": {
+    "n_estimators": 300,
+    "min_samples_leaf": 3,
+    "min_impurity_decrease": 0.001,
+    "max_features": "log2",
+    "max_depth": null
+  },
+  "timestamp": "2026-03-22T05:30:13.691198+00:00",
+  "training_time_s": 236.58,
+  "framework": "scikit-learn",
+  "format": "pkl",
+  "files": [
+    "best_model.pkl",
+    "reproducibility.json",
+    "inference_samples.json",
+    "api_export.py",
+    "training_log.csv",
+    "experiment_log.json",
+    "drift_hooks.json",
+    "metadata.json"
+  ]
+}

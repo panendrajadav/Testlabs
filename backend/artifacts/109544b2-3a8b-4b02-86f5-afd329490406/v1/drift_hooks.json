@@ -1,0 +1,32 @@
+{
+  "baseline_version": "v1",
+  "n_rows": 30,
+  "feature_stats": {
+    "": {
+      "mean": 14.5,
+      "std": 8.803408,
+      "min": 0.0,
+      "max": 29.0,
+      "p25": 7.25,
+      "p50": 14.5,
+      "p75": 21.75,
+      "null_rate": 0.0
+    },
+    "YearsExperience": {
+      "mean": 5.413333,
+      "std": 2.837888,
+      "min": 1.2,
+      "max": 10.6,
+      "p25": 3.3,
+      "p50": 4.8,
+      "p75": 7.8,
+      "null_rate": 0.0
+    }
+  },
+  "drift_thresholds": {
+    "mean_shift_z": 2.0,
+    "std_ratio": 1.5,
+    "null_rate_delta": 0.05
+  },
+  "note": "Compare incoming batch stats against feature_stats to detect drift."
+}

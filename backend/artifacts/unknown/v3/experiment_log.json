@@ -1,0 +1,360 @@
+{
+  "experiment_id": "unknown_v3",
+  "dataset_id": "unknown",
+  "version": "v3",
+  "timestamp": "2026-03-22T05:30:13.691198+00:00",
+  "training_time_s": 236.58,
+  "dataset_hash": "7b5f0a9903c76ae7",
+  "task_type": "regression",
+  "target_column": "gold volume",
+  "selected_features": [
+    "sp500 low",
+    "sp500 close",
+    "sp500 volume",
+    "nasdaq volume",
+    "eur_usd",
+    "silver high-low",
+    "platinum open",
+    "platinum high",
+    "platinum low",
+    "platinum close",
+    "platinum high-low",
+    "palladium volume"
+  ],
+  "n_features": 12,
+  "best_model": "random_forest",
+  "best_score": 0.5544,
+  "best_params": {
+    "n_estimators": 300,
+    "min_samples_leaf": 3,
+    "min_impurity_decrease": 0.001,
+    "max_features": "log2",
+    "max_depth": null
+  },
+  "justification": "Random Forest ranked 1st out of 10 models with a composite score of 0.5544 (50% CV + 30% test + 20% stability). CV score: 0.5930 | Test score: 0.5463 | CV std dev: 0.0530 | Overfit gap: 0.0976. Moderate stability across folds. Mild overfitting (gap 9.76%) \u2014 acceptable for most use cases. Note: both CV and test scores are below 0.60 \u2014 the model may be underfitting. Consider more features or a more complex model. Optimal hyperparameters found via RandomizedSearchCV (5-fold): n_estimators=300, min_samples_leaf=3, min_impurity_decrease=0.001, max_features=log2, max_depth=None.",
+  "is_underfit": true,
+  "models_evaluated": [
+    {
+      "model_name": "random_forest",
+      "score": 0.5544,
+      "metrics": {
+        "r2_score": 0.593,
+        "test_r2": 0.5463,
+        "train_r2": 0.6438,
+        "rmse": 3900721.4825,
+        "mae": 2671376.8764,
+        "cv_std": 0.053,
+        "cv_folds": 10,
+        "overfit_gap": 0.0976,
+        "overfit_penalty": 0.0,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "n_estimators": 300,
+          "min_samples_leaf": 3,
+          "min_impurity_decrease": 0.001,
+          "max_features": "log2",
+          "max_depth": null
+        },
+        "roc_auc": null
+      },
+      "params": {
+        "n_estimators": 300,
+        "min_samples_leaf": 3,
+        "min_impurity_decrease": 0.001,
+        "max_features": "log2",
+        "max_depth": null
+      }
+    },
+    {
+      "model_name": "knn",
+      "score": 0.5275,
+      "metrics": {
+        "r2_score": 0.5467,
+        "test_r2": 0.5362,
+        "train_r2": 0.6181,
+        "rmse": 3943777.3638,
+        "mae": 2587289.9886,
+        "cv_std": 0.0534,
+        "cv_folds": 10,
+        "overfit_gap": 0.0819,
+        "overfit_penalty": 0.0,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "weights": "uniform",
+          "n_neighbors": 11,
+          "metric": "euclidean"
+        }
+      },
+      "params": {
+        "weights": "uniform",
+        "n_neighbors": 11,
+        "metric": "euclidean"
+      }
+    },
+    {
+      "model_name": "xgboost",
+      "score": 0.5234,
+      "metrics": {
+        "r2_score": 0.6084,
+        "test_r2": 0.5942,
+        "train_r2": 0.7634,
+        "rmse": 3689021.3871,
+        "mae": 2511356.3384,
+        "cv_std": 0.0519,
+        "cv_folds": 10,
+        "overfit_gap": 0.1692,
+        "overfit_penalty": 0.0554,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "subsample": 1.0,
+          "reg_lambda": 2.0,
+          "reg_alpha": 0.1,
+          "n_estimators": 200,
+          "max_depth": 4,
+          "learning_rate": 0.1,
+          "colsample_bytree": 0.8
+        }
+      },
+      "params": {
+        "subsample": 1.0,
+        "reg_lambda": 2.0,
+        "reg_alpha": 0.1,
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.1,
+        "colsample_bytree": 0.8
+      }
+    },
+    {
+      "model_name": "gradient_boosting",
+      "score": 0.4949,
+      "metrics": {
+        "r2_score": 0.6095,
+        "test_r2": 0.5672,
+        "train_r2": 0.7633,
+        "rmse": 3809808.6091,
+        "mae": 2560127.8633,
+        "cv_std": 0.0516,
+        "cv_folds": 10,
+        "overfit_gap": 0.1961,
+        "overfit_penalty": 0.0769,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "subsample": 0.8,
+          "n_estimators": 300,
+          "min_samples_leaf": 1,
+          "max_depth": 4,
+          "learning_rate": 0.05
+        }
+      },
+      "params": {
+        "subsample": 0.8,
+        "n_estimators": 300,
+        "min_samples_leaf": 1,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      }
+    },
+    {
+      "model_name": "elastic_net",
+      "score": 0.4934,
+      "metrics": {
+        "r2_score": 0.4792,
+        "test_r2": 0.4868,
+        "train_r2": 0.4832,
+        "rmse": 4148530.621,
+        "mae": 2941856.6144,
+        "cv_std": 0.0461,
+        "cv_folds": 10,
+        "overfit_gap": -0.0036,
+        "overfit_penalty": 0.0,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "l1_ratio": 0.7,
+          "alpha": 0.001
+        }
+      },
+      "params": {
+        "l1_ratio": 0.7,
+        "alpha": 0.001
+      }
+    },
+    {
+      "model_name": "lasso",
+      "score": 0.4932,
+      "metrics": {
+        "r2_score": 0.4791,
+        "test_r2": 0.485,
+        "train_r2": 0.4839,
+        "rmse": 4155783.7585,
+        "mae": 2947851.2642,
+        "cv_std": 0.0459,
+        "cv_folds": 10,
+        "overfit_gap": -0.0012,
+        "overfit_penalty": 0.0,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "alpha": 10.0
+        }
+      },
+      "params": {
+        "alpha": 10.0
+      }
+    },
+    {
+      "model_name": "linear_regression",
+      "score": 0.4904,
+      "metrics": {
+        "r2_score": 0.4874,
+        "test_r2": 0.4838,
+        "train_r2": 0.5003,
+        "rmse": 4160865.8054,
+        "mae": 2908904.2825,
+        "cv_std": 0.0492,
+        "cv_folds": 10,
+        "overfit_gap": 0.0165,
+        "overfit_penalty": 0.0,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {}
+      },
+      "params": {}
+    },
+    {
+      "model_name": "ridge",
+      "score": 0.487,
+      "metrics": {
+        "r2_score": 0.4753,
+        "test_r2": 0.4891,
+        "train_r2": 0.4775,
+        "rmse": 4139448.2117,
+        "mae": 2932684.5447,
+        "cv_std": 0.0487,
+        "cv_folds": 10,
+        "overfit_gap": -0.0116,
+        "overfit_penalty": 0.0,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "alpha": 10.0
+        }
+      },
+      "params": {
+        "alpha": 10.0
+      }
+    },
+    {
+      "model_name": "decision_tree",
+      "score": 0.2905,
+      "metrics": {
+        "r2_score": 0.4215,
+        "test_r2": 0.3414,
+        "train_r2": 0.5224,
+        "rmse": 4699684.4973,
+        "mae": 3104741.2365,
+        "cv_std": 0.0789,
+        "cv_folds": 10,
+        "overfit_gap": 0.181,
+        "overfit_penalty": 0.0648,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {
+          "min_samples_split": 2,
+          "min_samples_leaf": 10,
+          "max_depth": 8,
+          "ccp_alpha": 0.005
+        }
+      },
+      "params": {
+        "min_samples_split": 2,
+        "min_samples_leaf": 10,
+        "max_depth": 8,
+        "ccp_alpha": 0.005
+      }
+    },
+    {
+      "model_name": "svm",
+      "score": 0.0924,
+      "metrics": {
+        "r2_score": -0.068,
+        "test_r2": -0.0979,
+        "train_r2": -0.0663,
+        "rmse": 6067885.568,
+        "mae": 3851251.9976,
+        "cv_std": 0.0221,
+        "cv_folds": 10,
+        "overfit_gap": 0.0316,
+        "overfit_penalty": 0.0,
+        "test_set_size": 744,
+        "train_set_size": 2975,
+        "best_params": {}
+      },
+      "params": {}
+    }
+  ],
+  "preprocessing_report": {
+    "original_shape": [
+      3719,
+      46
+    ],
+    "final_shape": [
+      3719,
+      43
+    ],
+    "dropped_missing": [
+      "us_rates_%",
+      "CPI",
+      "GDP"
+    ],
+    "dropped_variance": [],
+    "outliers_capped": {
+      "sp500 volume": 187,
+      "sp500 high-low": 244,
+      "nasdaq volume": 135,
+      "nasdaq high-low": 161,
+      "usd_chf": 65,
+      "silver open": 93,
+      "silver high": 96,
+      "silver low": 88,
+      "silver close": 89,
+      "silver volume": 235,
+      "silver high-low": 227,
+      "oil open": 16,
+      "oil high": 15,
+      "oil low": 12,
+      "oil close": 11,
+      "oil volume": 165,
+      "oil high-low": 217,
+      "platinum volume": 228,
+      "platinum high-low": 148,
+      "palladium open": 67,
+      "palladium high": 69,
+      "palladium low": 73,
+      "palladium close": 71,
+      "palladium volume": 323,
+      "palladium high-low": 300,
+      "gold open": 25,
+      "gold high": 26,
+      "gold low": 27,
+      "gold close": 25
+    },
+    "encoded_cols": [
+      "date"
+    ],
+    "coerced_cols": [],
+    "remaining_nulls": 0
+  },
+  "agent_logs": [
+    "EDA Agent: regression task, 3904 samples, 11 plots",
+    "Preprocessing: 3719x46 -> 3719x43 | dropped 3 cols | capped 3438 outliers | 0 nulls remaining",
+    "Feature Engineering Agent: Selected 12 features",
+    "Parallel Evaluation: 10 models \u2014 random_forest=0.5544 | knn=0.5275 | xgboost=0.5234 | gradient_boosting=0.4949 | elastic_net=0.4934 | lasso=0.4932 | linear_regression=0.4904 | ridge=0.4870 | decision_tree=0.2905 | svm=0.0924",
+    "Best: random_forest (0.5544)"
+  ]
+}

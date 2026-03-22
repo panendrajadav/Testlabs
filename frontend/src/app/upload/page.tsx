@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Upload as UploadIcon, CheckCircle, AlertCircle } from 'lucide-react'
 import { useUploadDataset, useRunPipeline } from '@/hooks/useApi'
+import { setStoredDataset } from '@/hooks/useStoredDataset'
+import { useQueryClient } from '@tanstack/react-query'
 import { containerVariants, itemVariants } from '@/animations/variants'
 
 export default function UploadPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -53,9 +56,12 @@ export default function UploadPage() {
       },
       {
         onSuccess: async (data) => {
-          localStorage.setItem('currentDataset', JSON.stringify(data))
-          window.dispatchEvent(new Event('datasetUpdated'))
-          await runMutation.mutateAsync({ datasetId: data.dataset_id })
+          queryClient.removeQueries({ queryKey: ['pipelineStatus'] })
+          setStoredDataset({ ...data, status: 'running', started_at: new Date().toISOString() })
+          await runMutation.mutateAsync({
+            datasetId: data.dataset_id,
+            targetColumn: data.target_column,
+          })
           router.push('/pipeline')
         },
       }

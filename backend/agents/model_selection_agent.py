@@ -16,9 +16,11 @@ def model_selection_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLS
         "classification": [
             "logistic_regression", "random_forest", "xgboost", "lightgbm",
             "svm", "decision_tree", "knn", "gradient_boosting", "extra_trees",
+            "naive_bayes", "linear_discriminant",
         ],
         "regression": [
-            "ridge", "lasso", "random_forest", "xgboost", "lightgbm",
+            "ridge", "lasso", "elastic_net", "bayesian_ridge", "huber",
+            "random_forest", "xgboost", "lightgbm",
             "svm", "decision_tree", "knn", "gradient_boosting", "extra_trees",
         ]
     }

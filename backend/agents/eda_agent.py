@@ -16,7 +16,7 @@ def create_llm(config: Dict[str, Any]):
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
             api_key=os.getenv("AZURE_OPENAI_API_KEY"),
             api_version="2024-05-01-preview",
-            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", "grok-4-1-fast-reasoning"),
+            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o"),
             temperature=config["llm"]["temperature"]
         )
     elif config["llm"]["provider"] == "openai":
@@ -25,64 +25,48 @@ def create_llm(config: Dict[str, Any]):
         return ChatAnthropic(model=config["llm"]["model"], temperature=config["llm"]["temperature"])
 
 def _build_plots(df: pl.DataFrame, numeric_cols: list, categorical_cols: list, target_col: str, task_type: str) -> Dict[str, Any]:
-    """Build Plotly-compatible chart data."""
     plots = {}
-
-    # Distribution histograms for numeric cols
     for col in numeric_cols[:8]:
         values = df[col].drop_nulls().to_list()
-        plots[f"dist_{col}"] = {
-            "type": "histogram",
-            "title": f"Distribution of {col}",
-            "x": values,
-            "xaxis": col,
-            "yaxis": "Count"
-        }
-
-    # Bar charts for categorical cols
+        plots[f"dist_{col}"] = {"type": "histogram", "title": f"Distribution of {col}", "x": values, "xaxis": col, "yaxis": "Count"}
     for col in categorical_cols[:5]:
         vc = df[col].value_counts().sort("count", descending=True).head(10)
-        plots[f"bar_{col}"] = {
-            "type": "bar",
-            "title": f"Value Counts: {col}",
-            "x": vc[col].to_list(),
-            "y": vc["count"].to_list(),
-            "xaxis": col,
-            "yaxis": "Count"
-        }
-
-    # Correlation heatmap data
+        plots[f"bar_{col}"] = {"type": "bar", "title": f"Value Counts: {col}", "x": vc[col].to_list(), "y": vc["count"].to_list(), "xaxis": col, "yaxis": "Count"}
     if len(numeric_cols) > 1:
         df_num = df.select(numeric_cols).to_pandas()
         corr = df_num.corr().round(3)
-        plots["correlation_heatmap"] = {
-            "type": "heatmap",
-            "title": "Feature Correlation Matrix",
-            "z": corr.values.tolist(),
-            "x": corr.columns.tolist(),
-            "y": corr.columns.tolist()
-        }
-
-    # Target distribution
+        plots["correlation_heatmap"] = {"type": "heatmap", "title": "Feature Correlation Matrix", "z": corr.values.tolist(), "x": corr.columns.tolist(), "y": corr.columns.tolist()}
     if task_type == "classification":
         vc = df[target_col].value_counts()
-        plots["target_distribution"] = {
-            "type": "pie",
-            "title": f"Target Distribution: {target_col}",
-            "labels": vc[target_col].cast(pl.Utf8).to_list(),
-            "values": vc["count"].to_list()
-        }
+        plots["target_distribution"] = {"type": "pie", "title": f"Target Distribution: {target_col}", "labels": vc[target_col].cast(pl.Utf8).to_list(), "values": vc["count"].to_list()}
     else:
         values = df[target_col].drop_nulls().to_list()
-        plots["target_distribution"] = {
-            "type": "histogram",
-            "title": f"Target Distribution: {target_col}",
-            "x": values,
-            "xaxis": target_col,
-            "yaxis": "Count"
-        }
-
+        plots["target_distribution"] = {"type": "histogram", "title": f"Target Distribution: {target_col}", "x": values, "xaxis": target_col, "yaxis": "Count"}
     return plots
+
+def _get_llm_insights(config, eda_summary) -> str:
+    """Run LLM insights — called in background thread, never blocks pipeline."""
+    try:
+        llm = create_llm(config)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are an expert data scientist analyzing a dataset."),
+            ("user", """Analyze this EDA summary and provide key insights:
+
+Dataset: {n_rows} rows, {n_cols} columns
+Task: {task_type}
+Numeric columns: {numeric_cols}
+Categorical columns: {categorical_cols}
+Missing values: {missing_values}
+Outliers detected: {outliers}
+Class balance: {class_balance}
+
+Provide 3-5 key insights about data quality and potential challenges.""")
+        ])
+        response = llm_invoke_with_retry(llm, prompt.format_messages(**eda_summary))
+        return response.content
+    except Exception as e:
+        logger.warning(f"LLM EDA insights failed (non-blocking): {e}")
+        return f"Task: {eda_summary.get('task_type')}. Features: {eda_summary.get('numeric_cols', []) + eda_summary.get('categorical_cols', [])}."
 
 def eda_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
     logger.info("=== EDA Agent Started ===")
@@ -100,18 +84,12 @@ def eda_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
     numeric_cols = column_types["numeric"]
     categorical_cols = column_types["categorical"]
 
-    # Run outlier detection and plot building in parallel
-    def _detect_outliers():
-        return {col: detect_outliers_iqr(df[col]) for col in numeric_cols}
-
-    def _build_plots_task():
-        return _build_plots(df, numeric_cols, categorical_cols, target_col, task_type)
-
+    # Run outlier detection and plot building in parallel — both pure Python, fast
     with ThreadPoolExecutor(max_workers=2) as executor:
-        outlier_future = executor.submit(_detect_outliers)
-        plots_future = executor.submit(_build_plots_task)
+        outlier_future = executor.submit(lambda: {col: detect_outliers_iqr(df[col]) for col in numeric_cols})
+        plots_future   = executor.submit(_build_plots, df, numeric_cols, categorical_cols, target_col, task_type)
         outliers = outlier_future.result()
-        plots = plots_future.result()
+        plots    = plots_future.result()
 
     class_balance = None
     if task_type == "classification":
@@ -127,36 +105,24 @@ def eda_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
         "outliers": {k: v for k, v in outliers.items() if v > 0},
         "class_balance": class_balance,
         "task_type": task_type,
+        # Placeholder — LLM fills this async after pipeline completes
+        "llm_insights": f"Task: {task_type}. {n_rows} rows, {len(numeric_cols)} numeric, {len(categorical_cols)} categorical features.",
     }
 
-    # Skip LLM insights for small datasets
+    # Fire-and-forget LLM insights only for large datasets — does NOT block pipeline
     if df.height >= 500:
-        llm = create_llm(config)
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert data scientist analyzing a dataset."),
-            ("user", """Analyze this EDA summary and provide key insights:
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(_get_llm_insights, config, {**eda_summary})
+        # Store future so pipeline.py can optionally await it at the very end
+        state["_eda_insights_future"] = future
+        executor.shutdown(wait=False)
 
-Dataset: {n_rows} rows, {n_cols} columns
-Task: {task_type}
-Numeric columns: {numeric_cols}
-Categorical columns: {categorical_cols}
-Missing values: {missing_values}
-Outliers detected: {outliers}
-Class balance: {class_balance}
-
-Provide 3-5 key insights about data quality and potential challenges.""")
-        ])
-        response = llm_invoke_with_retry(llm, prompt.format_messages(**eda_summary))
-        eda_summary["llm_insights"] = response.content
-    else:
-        eda_summary["llm_insights"] = f"Small dataset ({df.height} rows). Task: {task_type}. Features: {numeric_cols + categorical_cols}."
-
-    logger.info(f"Task Type: {task_type}, Shape: {n_rows}x{n_cols}, Plots generated: {len(plots)}")
+    logger.info(f"Task Type: {task_type}, Shape: {n_rows}x{n_cols}, Plots: {len(plots)}")
 
     state["eda_summary"] = eda_summary
-    state["eda_plots"] = plots
-    state["task_type"] = task_type
-    state["agent_logs"].append(f"EDA Agent: Detected {task_type} task with {n_rows} samples, {len(plots)} plots")
+    state["eda_plots"]   = plots
+    state["task_type"]   = task_type
+    state["agent_logs"].append(f"EDA Agent: {task_type} task, {n_rows} samples, {len(plots)} plots")
 
     logger.info("=== EDA Agent Completed ===")
     return state

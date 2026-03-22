@@ -1,0 +1,112 @@
+[
+  {
+    "input": {
+      "OverallQual": 7.0,
+      "YearBuilt": 2003.0,
+      "YearRemodAdd": 2003.0,
+      "ExterQual": 2.0,
+      "Foundation": 2.0,
+      "BsmtQual": 2.0,
+      "BsmtUnfSF": 150.0,
+      "TotalBsmtSF": 856.0,
+      "HeatingQC": 0.0,
+      "KitchenQual": 2.0,
+      "GarageYrBlt": 2003.0,
+      "GarageFinish": 1.0,
+      "GarageCars": 2.0,
+      "GarageArea": 548.0,
+      "SaleCondition": 4.0,
+      "SalePrice": 208500.0
+    },
+    "prediction": 8,
+    "actual": 8
+  },
+  {
+    "input": {
+      "OverallQual": 6.0,
+      "YearBuilt": 1976.0,
+      "YearRemodAdd": 1976.0,
+      "ExterQual": 3.0,
+      "Foundation": 1.0,
+      "BsmtQual": 2.0,
+      "BsmtUnfSF": 284.0,
+      "TotalBsmtSF": 1262.0,
+      "HeatingQC": 0.0,
+      "KitchenQual": 3.0,
+      "GarageYrBlt": 1976.0,
+      "GarageFinish": 1.0,
+      "GarageCars": 2.0,
+      "GarageArea": 460.0,
+      "SaleCondition": 4.0,
+      "SalePrice": 181500.0
+    },
+    "prediction": 8,
+    "actual": 8
+  },
+  {
+    "input": {
+      "OverallQual": 7.0,
+      "YearBuilt": 2001.0,
+      "YearRemodAdd": 2002.0,
+      "ExterQual": 2.0,
+      "Foundation": 2.0,
+      "BsmtQual": 2.0,
+      "BsmtUnfSF": 434.0,
+      "TotalBsmtSF": 920.0,
+      "HeatingQC": 0.0,
+      "KitchenQual": 2.0,
+      "GarageYrBlt": 2001.0,
+      "GarageFinish": 1.0,
+      "GarageCars": 2.0,
+      "GarageArea": 608.0,
+      "SaleCondition": 4.0,
+      "SalePrice": 223500.0
+    },
+    "prediction": 8,
+    "actual": 8
+  },
+  {
+    "input": {
+      "OverallQual": 7.0,
+      "YearBuilt": 1915.0,
+      "YearRemodAdd": 1970.0,
+      "ExterQual": 3.0,
+      "Foundation": 0.0,
+      "BsmtQual": 3.0,
+      "BsmtUnfSF": 540.0,
+      "TotalBsmtSF": 756.0,
+      "HeatingQC": 2.0,
+      "KitchenQual": 2.0,
+      "GarageYrBlt": 1998.0,
+      "GarageFinish": 2.0,
+      "GarageCars": 3.0,
+      "GarageArea": 642.0,
+      "SaleCondition": 0.0,
+      "SalePrice": 140000.0
+    },
+    "prediction": 8,
+    "actual": 8
+  },
+  {
+    "input": {
+      "OverallQual": 8.0,
+      "YearBuilt": 2000.0,
+      "YearRemodAdd": 2000.0,
+      "ExterQual": 2.0,
+      "Foundation": 2.0,
+      "BsmtQual": 2.0,
+      "BsmtUnfSF": 490.0,
+      "TotalBsmtSF": 1145.0,
+      "HeatingQC": 0.0,
+      "KitchenQual": 2.0,
+      "GarageYrBlt": 2000.0,
+      "GarageFinish": 1.0,
+      "GarageCars": 3.0,
+      "GarageArea": 836.0,
+      "SaleCondition": 4.0,
+      "SalePrice": 250000.0
+    },
+    "prediction": 8,
+    "actual": 8
+  }
+]

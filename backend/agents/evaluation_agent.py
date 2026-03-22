@@ -1,39 +1,19 @@
-from typing import Dict, Any
-from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import ChatPromptTemplate
+from typing import Dict, Any, List
 from graph.state import AutoMLState
 from utils.logger import logger
-from utils.helpers import llm_invoke_with_retry
-from tools.sklearn_tools import train_and_evaluate_sklearn, get_sklearn_model
-from tools.xgboost_tools import train_and_evaluate_xgboost, train_and_evaluate_lightgbm
+from tools.sklearn_tools import train_all_models_parallel
 import numpy as np
-import os
 
-def create_llm(config: Dict[str, Any]):
-    if config["llm"]["provider"] == "azure":
-        return AzureChatOpenAI(
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version="2024-05-01-preview",
-            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", "grok-4-1-fast-reasoning"),
-            temperature=config["llm"]["temperature"]
-        )
-    elif config["llm"]["provider"] == "openai":
-        return ChatOpenAI(model=config["llm"]["model"], temperature=config["llm"]["temperature"])
-    else:
-        return ChatAnthropic(model=config["llm"]["model"], temperature=config["llm"]["temperature"])
 
+# ── ROC curve ─────────────────────────────────────────────────────────────────
 def _compute_roc(model, X, y, task_type: str) -> Dict[str, Any]:
-    """Compute ROC curve data for classification."""
     try:
         from sklearn.metrics import roc_curve, auc
         from sklearn.preprocessing import label_binarize
-        import numpy as np
 
-        classes = np.unique(y)
         if task_type != "classification":
             return {}
+        classes = np.unique(y)
 
         if len(classes) == 2:
             if hasattr(model, "predict_proba"):
@@ -43,161 +23,206 @@ def _compute_roc(model, X, y, task_type: str) -> Dict[str, Any]:
             else:
                 return {}
             fpr, tpr, _ = roc_curve(y, y_score)
-            roc_auc = auc(fpr, tpr)
-            return {"fpr": fpr.tolist(), "tpr": tpr.tolist(), "auc": round(roc_auc, 4), "type": "binary"}
+            return {"fpr": fpr.tolist(), "tpr": tpr.tolist(), "auc": round(auc(fpr, tpr), 4), "type": "binary"}
         else:
-            y_bin = label_binarize(y, classes=classes)
             if not hasattr(model, "predict_proba"):
                 return {}
+            y_bin   = label_binarize(y, classes=classes)
             y_score = model.predict_proba(X)
-            roc_data = {"type": "multiclass", "classes": classes.tolist(), "curves": {}}
+            curves: Dict[str, Any] = {}
             for i, cls in enumerate(classes):
                 fpr, tpr, _ = roc_curve(y_bin[:, i], y_score[:, i])
-                roc_data["curves"][str(cls)] = {
-                    "fpr": fpr.tolist(), "tpr": tpr.tolist(), "auc": round(auc(fpr, tpr), 4)
-                }
-            return roc_data
+                curves[str(cls)] = {"fpr": fpr.tolist(), "tpr": tpr.tolist(), "auc": round(auc(fpr, tpr), 4)}
+            return {"type": "multiclass", "classes": classes.tolist(), "curves": curves}
     except Exception as e:
         logger.warning(f"ROC computation failed: {e}")
         return {}
 
-def _compute_shap(model, X, y, feature_names: list, model_name: str) -> Dict[str, Any]:
-    """Compute SHAP values for feature importance on held-out data."""
+
+def _extract_roc_auc(roc_data: Dict[str, Any]) -> float | None:
+    if not roc_data:
+        return None
+    if roc_data.get("type") == "binary":
+        return roc_data.get("auc")
+    curves = roc_data.get("curves", {})
+    if not curves:
+        return None
+    aucs = [v["auc"] for v in curves.values() if "auc" in v]
+    return round(sum(aucs) / len(aucs), 4) if aucs else None
+
+
+# ── SHAP / feature importance ─────────────────────────────────────────────────
+def _compute_shap(model, X, y, feature_names: List[str], model_name: str) -> Dict[str, Any]:
     try:
         import shap
-        if model_name in ["xgboost", "lightgbm", "random_forest", "decision_tree", "extra_trees", "gradient_boosting"]:
+
+        tree_models = {"random_forest", "gradient_boosting"}
+        linear_models = {"logistic_regression", "ridge", "lasso", "linear_regression"}
+
+        if model_name in tree_models:
             explainer = shap.TreeExplainer(model)
             shap_vals = explainer.shap_values(X)
             if isinstance(shap_vals, list):
-                shap_vals = shap_vals[0]
-            mean_abs = np.abs(shap_vals).mean(axis=0).tolist()
-        elif model_name in ["logistic_regression", "ridge", "lasso"]:
+                mean_abs = np.abs(np.array(shap_vals)).mean(axis=(0, 1)).tolist()
+            else:
+                mean_abs = np.abs(shap_vals).mean(axis=0).tolist()
+        elif model_name in linear_models:
             explainer = shap.LinearExplainer(model, X)
             shap_vals = explainer.shap_values(X)
             mean_abs = np.abs(shap_vals).mean(axis=0).tolist()
         else:
-            # SVM, KNN — use permutation importance as fallback
             from sklearn.inspection import permutation_importance
-            r = permutation_importance(model, X, y, n_repeats=5, random_state=42)
+            r = permutation_importance(model, X, y, n_repeats=5, random_state=42, n_jobs=-1)
             mean_abs = r.importances_mean.tolist()
 
-        importance = sorted(
-            zip(feature_names, mean_abs),
-            key=lambda x: x[1], reverse=True
-        )
+        importance = sorted(zip(feature_names, mean_abs), key=lambda x: x[1], reverse=True)
         return {
             "feature_names": [i[0] for i in importance],
-            "mean_abs_shap": [round(i[1], 6) for i in importance]
+            "mean_abs_shap":  [round(i[1], 6) for i in importance],
         }
     except Exception as e:
-        logger.warning(f"SHAP computation failed: {e}")
+        logger.warning(f"SHAP failed for {model_name}: {e}")
         return {}
 
-def evaluation_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
-    logger.info("=== Evaluation Agent Started ===")
 
-    model_name = state["current_model"]
+# ── Rule-based justification ─────────────────────────────────────────────────
+def _build_justification(best: Dict[str, Any], all_results: List[Dict[str, Any]], task_type: str) -> str:
+    m = best["metrics"]
+    name = best["model_name"].replace("_", " ").title()
+    is_clf = task_type == "classification"
 
-    # Sentinel: model selection exhausted all models
-    if model_name == "__done__":
-        logger.info("All models evaluated — skipping evaluation node")
-        state["iteration"] += 1
-        return state
-    params = state["current_params"]
-    task_type = state["task_type"]
-    df = state["processed_data"].to_pandas()
-    target_col = state["target_column"]
+    cv    = m.get("accuracy" if is_clf else "r2_score", 0)
+    test  = m.get("test_accuracy" if is_clf else "test_r2", 0)
+    std   = m.get("cv_std", 0)
+    gap   = m.get("overfit_gap", 0)
+    score = best["score"]
+
+    # Rank position
+    rank = next((i + 1 for i, r in enumerate(all_results) if r["model_name"] == best["model_name"]), 1)
+    total = len(all_results)
+
+    # Underfitting check
+    underfit = cv < 0.6 and test < 0.6
+    overfit  = gap > 0.15
+    mild_of  = 0.05 < gap <= 0.15
+
+    parts = [
+        f"{name} ranked 1st out of {total} models with a composite score of {score:.4f} "
+        f"(50% CV + 30% test + 20% stability).",
+        f"CV score: {cv:.4f} | Test score: {test:.4f} | CV std dev: {std:.4f} | Overfit gap: {gap:.4f}.",
+    ]
+
+    if std <= 0.03:
+        parts.append("Highly stable across folds (std dev <= 0.03) — reliable on unseen data.")
+    elif std <= 0.06:
+        parts.append("Moderate stability across folds.")
+    else:
+        parts.append("High variance across folds — results may vary with different data splits.")
+
+    if overfit:
+        parts.append(f"Warning: severe overfitting detected (gap {gap:.2%}). Model memorised training data.")
+    elif mild_of:
+        parts.append(f"Mild overfitting (gap {gap:.2%}) — acceptable for most use cases.")
+    elif gap <= 0.05:
+        parts.append("Excellent generalisation — train and test scores are closely aligned.")
+
+    if underfit:
+        parts.append("Note: both CV and test scores are below 0.60 — the model may be underfitting. Consider more features or a more complex model.")
+
+    params = best.get("params", {})
+    if params:
+        param_str = ", ".join(f"{k}={v}" for k, v in params.items())
+        parts.append(f"Optimal hyperparameters found via RandomizedSearchCV (5-fold): {param_str}.")
+
+    return " ".join(parts)
+
+
+# ── Main parallel evaluation agent ────────────────────────────────────────────
+def parallel_evaluation_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
+    logger.info("=== Parallel Evaluation Agent Started ===")
+
+    task_type     = state["task_type"]
+    df            = state["processed_data"].to_pandas()
+    target_col    = state["target_column"]
     feature_names = state["selected_features"]
+    cv_folds      = config["automl"].get("cv_folds", 3)
 
     X = df.drop(columns=[target_col]).values
     y = df[target_col].values
-    cv_folds = config["automl"]["cv_folds"]
 
-    try:
-        if model_name == "xgboost":
-            result = train_and_evaluate_xgboost(X, y, task_type, params, cv_folds)
-        elif model_name == "lightgbm":
-            result = train_and_evaluate_lightgbm(X, y, task_type, params, cv_folds)
-        else:
-            result = train_and_evaluate_sklearn(X, y, model_name, task_type, params, cv_folds)
+    # ── Train all models in parallel ──────────────────────────────────────────
+    all_results = train_all_models_parallel(
+        X, y, task_type,
+        cv_folds=cv_folds,
+        max_workers=len(state.get("_model_list", []) or [5]),  # up to 5 workers
+    )
 
-        metrics = result["metrics"]
-        trained_model = result["model"]
-        X_test = result.get("X_test", X)
-        y_test = result.get("y_test", y)
+    # ── Pick best (first after sort-by-score) ─────────────────────────────────
+    valid = [r for r in all_results if r["score"] > -999.0 and r["model"] is not None]
+    if not valid:
+        logger.error("All models failed — no valid results")
+        state["agent_logs"].append("Evaluation: all models failed")
+        return state
 
-        # Add F1 if not present — use held-out test data
-        if task_type == "classification" and "f1_score" not in metrics:
-            from sklearn.metrics import f1_score
-            y_pred = trained_model.predict(X_test)
-            metrics["f1_score"] = round(float(f1_score(y_test, y_pred, average="weighted")), 4)
+    best = valid[0]
+    best_model_name = best["model_name"]
+    best_score      = best["score"]
 
-        primary_score = metrics.get("accuracy", metrics.get("r2_score", 0.0))
+    logger.info(f"Best model: {best_model_name} (score={best_score:.4f})")
 
-        # Penalise overfitting: if train score is much higher than CV score,
-        # reduce the effective score so an overfit model never wins
-        overfit_gap = metrics.get("overfit_gap", 0.0)
-        OVERFIT_THRESHOLD = 0.05   # >5% gap triggers penalty
-        if overfit_gap > OVERFIT_THRESHOLD:
-            penalty = (overfit_gap - OVERFIT_THRESHOLD) * 0.5
-            adjusted_score = max(0.0, primary_score - penalty)
-            logger.warning(
-                f"{model_name}: overfit gap={overfit_gap:.4f} → penalised score "
-                f"{primary_score:.4f} → {adjusted_score:.4f}"
-            )
-            metrics["overfit_penalty"] = round(penalty, 4)
-            primary_score = adjusted_score
-        else:
-            metrics["overfit_penalty"] = 0.0
+    # ── ROC + SHAP only for best model ────────────────────────────────────────
+    X_test = best["X_test"]
+    y_test = best["y_test"]
 
-        # Compute ROC and SHAP on held-out test data only
-        roc_data = _compute_roc(trained_model, X_test, y_test, task_type)
-        if roc_data:
-            metrics["roc_auc"] = roc_data.get("auc", roc_data.get("curves", {}).get(str(list(roc_data.get("curves", {}).keys())[0]), {}).get("auc")) if roc_data else None
+    roc_data  = _compute_roc(best["model"], X_test, y_test, task_type)
+    shap_data = _compute_shap(best["model"], X_test, y_test, feature_names, best_model_name)
 
-        shap_data = _compute_shap(trained_model, X_test, y_test, feature_names, model_name)
+    # Attach roc_auc to best model metrics
+    best["metrics"]["roc_auc"] = _extract_roc_auc(roc_data)
 
-        logger.info(f"Model: {model_name}, Score: {primary_score:.4f}, Metrics: {metrics}")
+    # ── Underfitting detection ────────────────────────────────────────────────
+    best_cv   = best["metrics"].get("accuracy" if task_type == "classification" else "r2_score", 0)
+    best_test = best["metrics"].get("test_accuracy" if task_type == "classification" else "test_r2", 0)
+    is_underfit = best_cv < 0.6 and best_test < 0.6
 
-        eval_result = {
-            "model_name": model_name,
-            "params": params,
-            "metrics": metrics,
-            "score": primary_score,
-            "iteration": state["iteration"]
-        }
+    # ── Rule-based justification ──────────────────────────────────────────────
+    justification = _build_justification(best, valid, task_type)
 
-        state["evaluation_results"].append(eval_result)
-        state["models_tried"].append(eval_result)
+    # ── Build evaluation_results (all models, for comparison chart) ───────────
+    # Include only aggregated metrics — exclude X_test, y_test, predictions, raw data
+    evaluation_results = []
+    for r in all_results:
+        evaluation_results.append({
+            "model_name": r["model_name"],
+            "params":     r.get("params", {}),
+            "metrics":    {
+                # Include only the aggregated metrics, not raw predictions
+                k: v for k, v in r.get("metrics", {}).items()
+                if k not in ("predictions", "y_pred", "y_test", "X_test", "raw_predictions")
+            },
+            "score":      r["score"],
+            "iteration":  1,
+        })
 
-        if primary_score > state["best_score"]:
-            state["best_score"] = primary_score
-            state["best_model"] = model_name
-            state["best_params"] = params
-            state["roc_data"] = roc_data
-            state["shap_values"] = shap_data
-            logger.info(f"New best model: {model_name} with score {primary_score:.4f}")
+    # ── Update state ──────────────────────────────────────────────────────────
+    state["evaluation_results"] = evaluation_results
+    state["models_tried"]       = evaluation_results
+    state["best_model"]         = best_model_name
+    state["best_score"]         = best_score
+    state["best_params"]        = best.get("params", {})
+    state["roc_data"]           = roc_data if roc_data else None
+    state["shap_values"]        = shap_data if shap_data else None
+    state["current_model"]      = "__done__"
+    state["iteration"]          = len(all_results) + 1
+    state["justification"]      = justification
+    state["is_underfit"]        = is_underfit
+    # Store fitted model object transiently for artifacts_agent (not serialised to JSON)
+    state["_fitted_model"]      = best["model"]
 
-        # LLM analysis - skip for small datasets
-        if df.shape[0] >= 500:
-            llm = create_llm(config)
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are an expert ML engineer analyzing model performance."),
-                ("user", "Model: {model_name}\nScore: {score:.4f}\nMetrics: {metrics}\nBest so far: {best_score:.4f}\nIteration: {iteration}/{max_iterations}\n\nShould we continue? (1 sentence)")
-            ])
-            response = llm_invoke_with_retry(llm, prompt.format_messages(
-                model_name=model_name, score=primary_score, metrics=metrics,
-                best_score=state["best_score"], iteration=state["iteration"],
-                max_iterations=state["max_iterations"]
-            ))
-            logger.info(f"LLM Analysis: {response.content}")
+    # Summary log
+    summary = " | ".join(f"{r['model_name']}={r['score']:.4f}" for r in all_results)
+    state["agent_logs"].append(f"Parallel Evaluation: {len(all_results)} models — {summary}")
+    state["agent_logs"].append(f"Best: {best_model_name} ({best_score:.4f})")
 
-        state["agent_logs"].append(f"Evaluation Agent: {model_name} scored {primary_score:.4f}")
-
-    except Exception as e:
-        logger.error(f"Evaluation failed: {e}")
-        state["agent_logs"].append(f"Evaluation Agent: {model_name} failed - {str(e)}")
-
-    state["iteration"] += 1
-    logger.info("=== Evaluation Agent Completed ===")
+    logger.info("=== Parallel Evaluation Agent Completed ===")
     return state

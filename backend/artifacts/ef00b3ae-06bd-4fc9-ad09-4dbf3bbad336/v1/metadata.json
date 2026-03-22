@@ -1,0 +1,27 @@
+{
+  "version": "v1",
+  "dataset_id": "ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336",
+  "dataset_hash": "44834320268dc156",
+  "model_name": "svm",
+  "task_type": "classification",
+  "best_score": 0.6165,
+  "best_params": {
+    "kernel": "rbf",
+    "gamma": "auto",
+    "C": 100.0
+  },
+  "timestamp": "2026-03-22T14:54:30.837147+00:00",
+  "training_time_s": 98.5,
+  "framework": "scikit-learn",
+  "format": "pkl",
+  "files": [
+    "best_model.pkl",
+    "reproducibility.json",
+    "inference_samples.json",
+    "api_export.py",
+    "training_log.csv",
+    "experiment_log.json",
+    "drift_hooks.json",
+    "metadata.json"
+  ]
+}

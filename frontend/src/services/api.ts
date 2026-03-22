@@ -38,6 +38,80 @@ class ApiService {
     const response = await this.api.post('/analyst/chat', { dataset_id: datasetId, question })
     return response.data
   }
+
+  async getArtifactVersions(datasetId: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/versions`)
+    return response.data
+  }
+
+  async getArtifactDatasets() {
+    const response = await this.api.get('/artifacts/datasets/all')
+    return response.data
+  }
+
+  async getArtifactSummary(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/summary`)
+    return response.data
+  }
+
+  async getArtifactMetadata(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/metadata`)
+    return response.data
+  }
+
+  async getExperimentLog(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/experiment`)
+    return response.data
+  }
+
+  async getTrainingLog(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/training-log`)
+    return response.data
+  }
+
+  async getReproducibility(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/reproducibility`)
+    return response.data
+  }
+
+  async getInferenceSamples(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/inference-samples`)
+    return response.data
+  }
+
+  async getDriftHooks(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/drift-hooks`)
+    return response.data
+  }
+
+  async getApiExport(datasetId: string, version: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/${version}/api-export`)
+    return response.data
+  }
+
+  async rollbackVersion(datasetId: string, version: string) {
+    const response = await this.api.post(`/artifacts/${datasetId}/${version}/rollback`)
+    return response.data
+  }
+
+  async deleteVersion(datasetId: string, version: string) {
+    const response = await this.api.delete(`/artifacts/${datasetId}/${version}`)
+    return response.data
+  }
+
+  async deleteDataset(datasetId: string) {
+    const response = await this.api.delete(`/dataset/${datasetId}`)
+    return response.data
+  }
+
+  async compareVersions(datasetId: string) {
+    const response = await this.api.get(`/artifacts/${datasetId}/compare`)
+    return response.data
+  }
+
+  getModelDownloadUrl(datasetId: string, version: string) {
+    return `${API_BASE_URL}/api/v1/artifacts/${datasetId}/${version}/download`
+  }
 }
 
 export const apiService = new ApiService()

@@ -17,6 +17,7 @@ class AutoMLState(TypedDict):
 
     # Preprocessing
     preprocessing_config: Dict[str, Any]
+    preprocessing_report: Dict[str, Any]
 
     # Feature engineering
     feature_config: Dict[str, Any]
@@ -43,5 +44,18 @@ class AutoMLState(TypedDict):
     # Logging
     agent_logs: List[str]
 
+    # Justification & fit diagnosis
+    justification: Optional[str]
+    is_underfit: Optional[bool]
+
+    # Artifacts
+    artifact_version:  Optional[str]
+    artifact_dir:      Optional[str]
+    artifact_metadata: Optional[Dict[str, Any]]
+
     # Final output
     final_report: Optional[Dict[str, Any]]
+
+    # Transient fields — preserved across LangGraph nodes, not serialised to result payload
+    _dataset_id:     Optional[str]
+    _fitted_model:   Optional[Any]

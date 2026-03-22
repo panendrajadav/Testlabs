@@ -17,13 +17,15 @@ def llm_invoke_with_retry(llm, messages, retries: int = 3) -> Any:
             time.sleep(wait)
 
 def detect_task_type(y: pl.Series) -> str:
-    if y.dtype in [pl.Utf8, pl.Categorical] or y.n_unique() < 20:
+    if y.dtype in [pl.String, pl.Categorical, pl.Enum] or y.n_unique() < 20:
         return "classification"
     return "regression"
 
 def get_column_types(df: pl.DataFrame) -> Dict[str, List[str]]:
-    numeric_cols = [col for col in df.columns if df[col].dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64]]
-    categorical_cols = [col for col in df.columns if df[col].dtype in [pl.Utf8, pl.Categorical]]
+    numeric_dtypes = {pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64}
+    string_dtypes  = {pl.String, pl.Categorical}
+    numeric_cols     = [col for col in df.columns if df[col].dtype in numeric_dtypes]
+    categorical_cols = [col for col in df.columns if df[col].dtype in string_dtypes]
     return {"numeric": numeric_cols, "categorical": categorical_cols}
 
 def calculate_missing_percentage(df: pl.DataFrame) -> Dict[str, float]:

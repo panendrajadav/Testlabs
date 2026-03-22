@@ -1,100 +1,50 @@
 from typing import Dict, Any
-from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import ChatPromptTemplate
 from graph.state import AutoMLState
 from utils.logger import logger
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 import polars as pl
-import os
 
-def create_llm(config: Dict[str, Any]):
-    """Create LLM instance based on config."""
-    if config["llm"]["provider"] == "azure":
-        return AzureChatOpenAI(
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version="2024-05-01-preview",
-            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", "grok-4-1-fast-reasoning"),
-            temperature=config["llm"]["temperature"]
-        )
-    elif config["llm"]["provider"] == "openai":
-        return ChatOpenAI(model=config["llm"]["model"], temperature=config["llm"]["temperature"])
-    else:
-        return ChatAnthropic(model=config["llm"]["model"], temperature=config["llm"]["temperature"])
+# Pure sklearn feature selection — no LLM, deterministic and fast
 
 def feature_engineering_agent(state: AutoMLState, config: Dict[str, Any]) -> AutoMLState:
-    """Select and engineer features intelligently."""
     logger.info("=== Feature Engineering Agent Started ===")
-    
+
     df = state["processed_data"].clone()
     target_col = state["target_column"]
     task_type = state["task_type"]
-    
-    # Convert to pandas for sklearn
+
     df_pd = df.to_pandas()
     X = df_pd.drop(columns=[target_col])
     y = df_pd[target_col]
-    
+
+    # Safety net: drop any rows where y is still NaN
+    nan_mask = y.isna()
+    if nan_mask.any():
+        logger.warning(f"Dropping {nan_mask.sum()} rows with NaN target in feature engineering")
+        X = X[~nan_mask].reset_index(drop=True)
+        y = y[~nan_mask].reset_index(drop=True)
     n_features = X.shape[1]
-
-    # Skip LLM for small datasets or few features
-    if df.height < 500 or n_features <= 10:
-        llm_decision = "no, keep all"
-        logger.info("Small dataset or few features — keeping all features")
-    else:
-        llm = create_llm(config)
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert ML engineer deciding feature engineering strategy."),
-            ("user", """Dataset has {n_features} features for {task_type} task.
-
-Decide:
-- Should we do feature selection? (yes/no)
-- If yes, keep top K features where K = ?
-- Suggest K as a number between 5 and {n_features}
-
-Keep response brief: just "yes, K=X" or "no, keep all".""")
-        ])
-        try:
-            response = llm.invoke(prompt.format_messages(
-                n_features=n_features,
-                task_type=task_type
-            ))
-            llm_decision = response.content
-        except Exception as e:
-            logger.warning(f"LLM feature decision failed: {e} — keeping all features")
-            llm_decision = "no, keep all"
-    logger.info(f"LLM Feature Engineering Decision: {llm_decision}")
-    
-    # Feature selection
     selected_features = X.columns.tolist()
-    
-    if "yes" in llm_decision.lower() and n_features > 10:
-        try:
-            import re
-            digits = re.findall(r'\d+', llm_decision)
-            k = min(int(digits[0]), n_features - 1) if digits else min(10, n_features - 1)
-        except:
-            k = min(10, n_features - 1)
-        
+
+    # Auto feature selection: only when > 15 features, keep top sqrt(n)*2 capped at 20
+    if n_features > 15:
+        k = min(max(int(n_features ** 0.5) * 2, 10), n_features - 1)
         score_func = f_classif if task_type == "classification" else f_regression
         selector = SelectKBest(score_func=score_func, k=k)
-        X_selected = selector.fit_transform(X, y)
+        selector.fit_transform(X, y)
         selected_features = X.columns[selector.get_support()].tolist()
-        
         X = X[selected_features]
-        logger.info(f"Selected top {k} features: {selected_features}")
+        logger.info(f"Selected top {k} features from {n_features}: {selected_features}")
     else:
-        logger.info("Keeping all features")
-    
-    # Update dataframe and convert back to polars
+        logger.info(f"Keeping all {n_features} features")
+
     X[target_col] = y.values
     df_engineered = pl.from_pandas(X)
-    
+
     state["processed_data"] = df_engineered
     state["selected_features"] = selected_features
-    state["feature_config"] = {"llm_decision": llm_decision, "n_features": len(selected_features)}
+    state["feature_config"] = {"strategy": "selectkbest", "n_features": len(selected_features)}
     state["agent_logs"].append(f"Feature Engineering Agent: Selected {len(selected_features)} features")
-    
+
     logger.info("=== Feature Engineering Agent Completed ===")
     return state
