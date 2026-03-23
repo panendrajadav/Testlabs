@@ -39,28 +39,25 @@ export default function PipelinePage() {
       // Push full artifacts to Firestore once per completion
       if (!artifactsSynced.current) {
         artifactsSynced.current = true
-        const version = status.result.artifact_version
+        const result = status.result
+        const version = result.artifact_version
         if (version) {
           apiService.getArtifactSummary(datasetId, version)
             .then((summary) => {
               const payload: ArtifactPayload = {
-                // Identity
                 version,
                 dataset_id:          datasetId,
-                // Best model
-                model_name:          status.result.best_model          ?? '',
-                task_type:           status.result.task_type           ?? '',
-                best_score:          status.result.best_score          ?? null,
-                best_params:         status.result.best_params         ?? {},
+                model_name:          result.best_model          ?? '',
+                task_type:           result.task_type           ?? '',
+                best_score:          result.best_score          ?? null,
+                best_params:         result.best_params         ?? {},
                 timestamp:           summary.metadata?.timestamp       ?? new Date().toISOString(),
                 training_time_s:     summary.metadata?.training_time_s ?? 0,
-                target_column:       status.result.target_column       ?? '',
-                selected_features:   status.result.selected_features   ?? [],
-                justification:       status.result.justification       ?? null,
-                is_underfit:         status.result.is_underfit         ?? false,
-                // All models — full metrics
-                evaluation_results:  status.result.evaluation_results  ?? [],
-                // Artifact file contents
+                target_column:       result.target_column       ?? '',
+                selected_features:   result.selected_features   ?? [],
+                justification:       result.justification       ?? null,
+                is_underfit:         result.is_underfit         ?? false,
+                evaluation_results:  result.evaluation_results  ?? [],
                 metadata:            summary.metadata                  ?? null,
                 experiment_log:      summary.experiment                ?? null,
                 training_log:        summary.training_log              ?? null,
@@ -70,12 +67,11 @@ export default function PipelinePage() {
                 api_export_code:     summary.api_export_code           ?? null,
                 model_file_exists:   summary.model_file_exists         ?? false,
                 model_size_kb:       summary.model_size_kb             ?? null,
-                // Pipeline extras
-                agent_logs:          status.result.agent_logs          ?? [],
-                eda_summary:         status.result.eda_summary         ?? null,
-                shap_values:         status.result.shap_values         ?? null,
-                roc_data:            status.result.roc_data            ?? null,
-                preprocessing_report: status.result.preprocessing_report ?? null,
+                agent_logs:          result.agent_logs          ?? [],
+                eda_summary:         result.eda_summary         ?? null,
+                shap_values:         result.shap_values         ?? null,
+                roc_data:            result.roc_data            ?? null,
+                preprocessing_report: result.preprocessing_report ?? null,
               }
               return fsSetArtifacts(datasetId, version, payload)
             })
