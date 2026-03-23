@@ -7,9 +7,10 @@ from utils.helpers import detect_task_type, get_column_types
 
 router = APIRouter()
 
-UPLOAD_DIR   = "uploads"
-ARTIFACTS_DIR = "artifacts"
-RESULTS_DIR   = "results"
+_BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+UPLOAD_DIR    = os.path.join(_BASE, "uploads")
+ARTIFACTS_DIR = os.path.join(_BASE, "artifacts")
+RESULTS_DIR   = os.path.join(_BASE, "results")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 

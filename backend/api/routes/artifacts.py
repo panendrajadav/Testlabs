@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from utils.logger import logger
 
 router = APIRouter()
-ARTIFACTS_DIR = "artifacts"
+ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "artifacts")
 
 
 def _version_meta(dataset_id: str, version: str) -> Dict[str, Any]:

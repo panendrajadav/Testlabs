@@ -2,14 +2,14 @@ llm:
   provider: azure
   model: gpt-4o
   temperature: 0.3
-  azure_endpoint: https://panendrajadav-1606-resource.services.ai.azure.com/models/chat/completions
+  azure_endpoint: ${AZURE_OPENAI_ENDPOINT}
   api_version: 2024-05-01-preview
 
 automl:
   task_type: auto
-  cv_folds: 5              # 5-fold CV — standard for robust evaluation
-  score_threshold: 0.99    # stop early only if near-perfect
-  max_iterations: 1        # parallel mode: single pass, no loop needed
+  cv_folds: 5
+  score_threshold: 0.99
+  max_iterations: 1
 
 optuna:
   n_trials: 3

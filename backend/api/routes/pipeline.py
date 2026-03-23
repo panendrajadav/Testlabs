@@ -13,9 +13,11 @@ from agents.artifacts_agent import artifacts_agent
 from utils.logger import logger
 
 router = APIRouter()
-UPLOAD_DIR = "uploads"
-RESULTS_DIR = "results"
+_BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+UPLOAD_DIR  = os.path.join(_BASE, "uploads")
+RESULTS_DIR = os.path.join(_BASE, "results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ── In-memory stores ──────────────────────────────────────────────────────────
 pipeline_jobs: dict = {}       # dataset_id → {status, progress, result, error}
@@ -27,8 +29,12 @@ _pipeline_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pipel
 
 
 def _load_config() -> dict:
-    with open("config.yaml") as f:
-        return yaml.safe_load(f)
+    import re
+    config_path = os.path.join(_BASE, "config.yaml")
+    with open(config_path) as f:
+        raw = f.read()
+    raw = re.sub(r'\$\{([^}]+)\}', lambda m: os.getenv(m.group(1), m.group(0)), raw)
+    return yaml.safe_load(raw)
 
 
 def _detect_target(df: pl.DataFrame) -> str:

@@ -26,7 +26,7 @@ import pandas as pd
 from graph.state import AutoMLState
 from utils.logger import logger
 
-ARTIFACTS_DIR = "artifacts"
+ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
