@@ -21,7 +21,7 @@ plotly==5.22.0
 polars==0.20.31
 
 # LLM / LangChain — pinned compatible set
-openai==1.30.5
+openai==1.35.0
 anthropic==0.28.0
 langchain==0.2.6
 langchain-core==0.2.10
