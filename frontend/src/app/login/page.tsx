@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Zap, AlertCircle, Lock, User } from 'lucide-react'
 import { login, useAuth } from '@/hooks/useAuth'
 import NeuralNetworkBackground from '@/components/visualization/NeuralNetworkBackground'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
   const { isLoggedIn } = useAuth()
@@ -19,7 +19,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Already logged in — skip straight to destination
   useEffect(() => {
     if (isLoggedIn) router.replace(redirect)
   }, [isLoggedIn])
@@ -28,7 +27,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    await new Promise(r => setTimeout(r, 600)) // brief auth feel
+    await new Promise(r => setTimeout(r, 600))
     const ok = login(username.trim(), password)
     if (ok) {
       router.replace(redirect)
@@ -189,5 +188,13 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }
