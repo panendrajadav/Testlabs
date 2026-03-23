@@ -9,7 +9,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.13
       - key: ALLOWED_ORIGINS
-        value: https://testlabs-frontend.onrender.com
+        value: https://testlabs-f.onrender.com
       - key: AZURE_OPENAI_API_KEY
         sync: false
       - key: AZURE_OPENAI_ENDPOINT
@@ -25,7 +25,7 @@ services:
     startCommand: node .next/standalone/server.js
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        value: https://testlabs-backend.onrender.com
+        value: https://testlabs-b.onrender.com
       - key: PORT
         value: 3000
       - key: HOSTNAME

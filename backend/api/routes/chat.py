@@ -11,7 +11,7 @@ from utils.helpers import llm_invoke_with_retry
 from utils.logger import logger
 
 router = APIRouter()
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
 
 def _create_llm():
     return AzureChatOpenAI(
