@@ -19,7 +19,12 @@ const SESSIONS    = 'sessions'
 
 function stripUndefined<T extends object>(obj: T): T {
   return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined)
+    Object.entries(obj)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [
+        k,
+        v && typeof v === 'object' && !Array.isArray(v) ? stripUndefined(v as object) : v
+      ])
   ) as T
 }
 
@@ -39,7 +44,7 @@ export async function fsUpdateExperiment(
   patch: Partial<StoredDataset>
 ): Promise<void> {
   const ref = doc(db, EXPERIMENTS, datasetId)
-  await updateDoc(ref, { ...stripUndefined(patch as object), updatedAt: serverTimestamp() })
+  await setDoc(ref, { ...stripUndefined(patch as object), updatedAt: serverTimestamp() }, { merge: true })
 }
 
 export async function fsDeleteExperiment(datasetId: string): Promise<void> {
@@ -118,7 +123,10 @@ export async function fsSetCurrentDataset(
   dataset: StoredDataset | null
 ): Promise<void> {
   const ref = doc(db, SESSIONS, username)
-  await setDoc(ref, { currentDataset: dataset ?? null, updatedAt: serverTimestamp() }, { merge: true })
+  await setDoc(ref, {
+    currentDataset: dataset ? stripUndefined(dataset as object) : null,
+    updatedAt: serverTimestamp()
+  }, { merge: true })
 }
 
 export async function fsGetCurrentDataset(username: string): Promise<StoredDataset | null> {
