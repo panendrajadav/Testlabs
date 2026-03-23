@@ -57,7 +57,7 @@ export default function PipelinePage() {
                 selected_features:   result.selected_features   ?? [],
                 justification:       result.justification       ?? null,
                 is_underfit:         result.is_underfit         ?? false,
-                evaluation_results:  (result.evaluation_results ?? []) as Record<string, unknown>[],
+                evaluation_results:  (result.evaluation_results ?? []) as unknown as Record<string, unknown>[],
                 metadata:            summary.metadata                  ?? null,
                 experiment_log:      summary.experiment                ?? null,
                 training_log:        summary.training_log              ?? null,
