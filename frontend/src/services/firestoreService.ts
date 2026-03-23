@@ -32,11 +32,8 @@ function stripUndefined<T extends object>(obj: T): T {
 
 export async function fsSetExperiment(data: StoredDataset): Promise<void> {
   const ref = doc(db, EXPERIMENTS, data.dataset_id)
-  await setDoc(ref, {
-    ...stripUndefined(data),
-    started_at: data.started_at ?? new Date().toISOString(),
-    updatedAt:  serverTimestamp(),
-  }, { merge: true })
+  const clean = JSON.parse(JSON.stringify({ ...data, started_at: data.started_at ?? new Date().toISOString() }, (_, v) => v === undefined ? null : v))
+  await setDoc(ref, { ...clean, updatedAt: serverTimestamp() }, { merge: true })
 }
 
 export async function fsUpdateExperiment(
@@ -44,7 +41,8 @@ export async function fsUpdateExperiment(
   patch: Partial<StoredDataset>
 ): Promise<void> {
   const ref = doc(db, EXPERIMENTS, datasetId)
-  await setDoc(ref, { ...stripUndefined(patch as object), updatedAt: serverTimestamp() }, { merge: true })
+  const clean = JSON.parse(JSON.stringify(patch, (_, v) => v === undefined ? null : v))
+  await setDoc(ref, { ...clean, updatedAt: serverTimestamp() }, { merge: true })
 }
 
 export async function fsDeleteExperiment(datasetId: string): Promise<void> {
@@ -103,9 +101,9 @@ export async function fsSetArtifacts(
   version: string,
   payload: ArtifactPayload
 ): Promise<void> {
-  // artifacts/{datasetId}/{version}  — subcollection doc
   const ref = doc(db, ARTIFACTS, datasetId, 'versions', version)
-  await setDoc(ref, { ...stripUndefined(payload as object), savedAt: serverTimestamp() })
+  const clean = JSON.parse(JSON.stringify(payload, (_, v) => v === undefined ? null : v))
+  await setDoc(ref, { ...clean, savedAt: serverTimestamp() })
 }
 
 export async function fsDeleteArtifacts(datasetId: string): Promise<void> {
@@ -123,10 +121,8 @@ export async function fsSetCurrentDataset(
   dataset: StoredDataset | null
 ): Promise<void> {
   const ref = doc(db, SESSIONS, username)
-  await setDoc(ref, {
-    currentDataset: dataset ? stripUndefined(dataset as object) : null,
-    updatedAt: serverTimestamp()
-  }, { merge: true })
+  const clean = dataset ? JSON.parse(JSON.stringify(dataset, (_, v) => v === undefined ? null : v)) : null
+  await setDoc(ref, { currentDataset: clean, updatedAt: serverTimestamp() }, { merge: true })
 }
 
 export async function fsGetCurrentDataset(username: string): Promise<StoredDataset | null> {
