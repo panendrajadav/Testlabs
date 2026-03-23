@@ -4,6 +4,7 @@ uvicorn[standard]==0.29.0
 python-multipart==0.0.9
 python-dotenv==1.0.1
 pyyaml==6.0.1
+firebase-admin==6.5.0
 
 # ML core — pre-built manylinux wheels for Python 3.10
 numpy==1.26.4

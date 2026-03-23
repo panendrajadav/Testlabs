@@ -29,6 +29,49 @@ from utils.logger import logger
 ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts")
 
 
+# ── Firestore client (lazy init) ──────────────────────────────────────────────
+
+_fs_client = None
+
+def _get_firestore():
+    global _fs_client
+    if _fs_client is not None:
+        return _fs_client
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, firestore
+        if not firebase_admin._apps:
+            # Check env var first, then look next to this file
+            cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+            if not cred_path:
+                cred_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "firebase-service-account.json")
+            if cred_path and os.path.exists(cred_path):
+                cred = credentials.Certificate(cred_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            firebase_admin.initialize_app(cred)
+        _fs_client = firestore.client()
+        return _fs_client
+    except Exception as e:
+        logger.warning(f"Firestore init failed (non-fatal): {e}")
+        return None
+
+
+def _save_to_firestore_experiments(rows: List[Dict[str, Any]], dataset_id: str, version: str):
+    """Write experiment rows to Firestore all_experiments collection."""
+    try:
+        db = _get_firestore()
+        if db is None:
+            return
+        for row in rows:
+            doc_id = f"{dataset_id}_{version}_{row.get('model_name', 'unknown')}"
+            clean = json.loads(json.dumps(row, default=str))
+            db.collection("all_experiments").document(doc_id).set(clean, merge=True)
+        logger.info(f"Saved {len(rows)} experiment rows to Firestore")
+    except Exception as e:
+        logger.warning(f"Firestore experiment write failed (non-fatal): {e}")
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _dataset_hash(df: pd.DataFrame) -> str:
@@ -213,6 +256,9 @@ def _save_training_log(eval_results: List[Dict[str, Any]], task_type: str,
         if write_header and rows:
             writer.writeheader()
         writer.writerows(rows)
+
+    # Also write to Firestore global experiments collection
+    _save_to_firestore_experiments(rows, dataset_id, version)
 
 
 # ── Step 6: Experiment log (JSON — full structured record) ────────────────────

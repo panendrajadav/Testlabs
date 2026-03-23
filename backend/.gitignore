@@ -23,7 +23,10 @@ wheels/
 .installed.cfg
 *.egg
 
-# Logs
+# Runtime data — ephemeral, never commit
+artifacts/
+uploads/
+results/
 logs/
 *.log
 
@@ -41,6 +44,7 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+firebase-service-account.json
 
 # Jupyter
 .ipynb_checkpoints/
