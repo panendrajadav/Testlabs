@@ -20,10 +20,13 @@ _extra = os.getenv("ALLOWED_ORIGINS", "")
 if _extra:
     _origins += [o.strip() for o in _extra.split(",") if o.strip()]
 
+# If ALLOW_ALL_ORIGINS is set (e.g. for debugging), use wildcard
+_allow_all = os.getenv("ALLOW_ALL_ORIGINS", "").lower() in ("1", "true", "yes")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
-    allow_credentials=True,
+    allow_origins=["*"] if _allow_all else _origins,
+    allow_credentials=False if _allow_all else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
