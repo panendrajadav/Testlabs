@@ -19,6 +19,7 @@ plotly==5.22.0
 
 # Data processing
 polars==0.20.31
+pyarrow==15.0.2
 
 # LLM / LangChain — pinned compatible set
 openai==1.40.0
