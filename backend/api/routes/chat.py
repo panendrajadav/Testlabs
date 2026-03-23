@@ -187,9 +187,12 @@ async def chat_analyst(request: ChatRequest):
 
     answer = _clean_answer(answer)
 
-    # Ensure chart is a plain dict (not a Plotly object)
-    if chart is not None and hasattr(chart, "to_dict"):
-        chart = chart.to_dict()
+    # Ensure chart is fully JSON-serializable (convert numpy arrays etc.)
+    if chart is not None:
+        if hasattr(chart, "to_dict"):
+            chart = chart.to_dict()
+        import json
+        chart = json.loads(json.dumps(chart, default=lambda x: x.tolist() if hasattr(x, 'tolist') else str(x)))
 
     return ChatResponse(
         answer=answer,
