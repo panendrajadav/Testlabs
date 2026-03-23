@@ -48,18 +48,18 @@ REGRESSION_MODELS: Dict[str, Any] = {
 try:
     from xgboost import XGBClassifier, XGBRegressor
     CLASSIFICATION_MODELS["xgboost"] = XGBClassifier(
-        n_estimators=200, learning_rate=0.05, max_depth=4,
+        n_estimators=100, learning_rate=0.1, max_depth=4,
         subsample=0.8, colsample_bytree=0.8,
-        reg_alpha=0.1, reg_lambda=1.0,          # L1 + L2
+        reg_alpha=0.1, reg_lambda=1.0,
         eval_metric="logloss", random_state=42,
-        verbosity=0, n_jobs=-1,
+        verbosity=0, n_jobs=1,
     )
     REGRESSION_MODELS["xgboost"] = XGBRegressor(
-        n_estimators=200, learning_rate=0.05, max_depth=4,
+        n_estimators=100, learning_rate=0.1, max_depth=4,
         subsample=0.8, colsample_bytree=0.8,
         reg_alpha=0.1, reg_lambda=1.0,
         eval_metric="rmse", random_state=42,
-        verbosity=0, n_jobs=-1,
+        verbosity=0, n_jobs=1,
     )
     logger.info("XGBoost available — added to model registry")
 except ImportError:
@@ -120,10 +120,10 @@ _HPO_GRIDS: Dict[str, Dict[str, Any]] = {
 }
 
 _NEEDS_SCALING   = {"logistic_regression", "svm", "knn", "ridge", "lasso", "linear_regression", "elastic_net"}
-_HPO_N_ITER      = 12   # RandomizedSearchCV iterations per model (phase 2 / full data)
-_HPO_N_ITER_FAST = 5    # phase 1 screening iterations
-_SUBSAMPLE_RATIO = 0.25 # fraction used for phase-1 model screening
-_TOP_K_MODELS    = 3    # top-K models promoted to phase-2 full training
+_HPO_N_ITER      = 5    # RandomizedSearchCV iterations per model (phase 2 / full data)
+_HPO_N_ITER_FAST = 3    # phase 1 screening iterations
+_SUBSAMPLE_RATIO = 0.4  # fraction used for phase-1 model screening
+_TOP_K_MODELS    = 2    # top-K models promoted to phase-2 full training
 # Models that support early stopping via eval_set
 _EARLY_STOP_MODELS = {"xgboost", "lightgbm"}
 

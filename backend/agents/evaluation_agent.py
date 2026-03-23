@@ -72,7 +72,7 @@ def _compute_shap(model, X, y, feature_names: List[str], model_name: str) -> Dic
             mean_abs = np.abs(shap_vals).mean(axis=0).tolist()
         else:
             from sklearn.inspection import permutation_importance
-            r = permutation_importance(model, X, y, n_repeats=5, random_state=42, n_jobs=-1)
+            r = permutation_importance(model, X, y, n_repeats=3, random_state=42, n_jobs=1)
             mean_abs = r.importances_mean.tolist()
 
         importance = sorted(zip(feature_names, mean_abs), key=lambda x: x[1], reverse=True)
