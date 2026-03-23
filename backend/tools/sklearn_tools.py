@@ -51,15 +51,13 @@ try:
         n_estimators=100, learning_rate=0.1, max_depth=4,
         subsample=0.8, colsample_bytree=0.8,
         reg_alpha=0.1, reg_lambda=1.0,
-        eval_metric="logloss", random_state=42,
-        verbosity=0, n_jobs=1,
+        random_state=42, verbosity=0, n_jobs=1,
     )
     REGRESSION_MODELS["xgboost"] = XGBRegressor(
         n_estimators=100, learning_rate=0.1, max_depth=4,
         subsample=0.8, colsample_bytree=0.8,
         reg_alpha=0.1, reg_lambda=1.0,
-        eval_metric="rmse", random_state=42,
-        verbosity=0, n_jobs=1,
+        random_state=42, verbosity=0, n_jobs=1,
     )
     logger.info("XGBoost available — added to model registry")
 except ImportError:
