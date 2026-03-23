@@ -121,7 +121,7 @@ export default function ModelsPage() {
   const isLuckySplit = testScore > trainScore + 0.01
   const justification = (result as any).justification as string | undefined
   const isUnderfit = (result as any).is_underfit as boolean | undefined
-  const bestParams = (metrics.best_params ?? result.best_params ?? {}) as Record<string, any>
+  const bestParams = ((metrics.best_params as unknown ?? result.best_params ?? {}) as Record<string, any>)
 
   // Format a metric value based on its type
   const fmt = (value: number | null | undefined, type: 'score' | 'error' | 'std') => {

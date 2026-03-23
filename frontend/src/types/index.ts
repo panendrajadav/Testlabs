@@ -36,6 +36,10 @@ export interface PipelineResult {
   } | null
   shap_values: { feature_names: string[]; mean_abs_shap: number[] } | null
   agent_logs: string[]
+  artifact_version?: string
+  justification?: string
+  is_underfit?: boolean
+  preprocessing_report?: Record<string, unknown> | null
 }
 
 export interface PipelineStatus {
