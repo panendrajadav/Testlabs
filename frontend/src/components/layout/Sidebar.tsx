@@ -10,7 +10,6 @@ import {
   ChevronRight, CheckCircle, XCircle, Loader2, FlaskConical,
   Pencil, Trash2, X, Check,
 } from 'lucide-react'
-import { slideInFromLeftVariants } from '@/animations/variants'
 import { useExperiments, useStoredDataset, setStoredDataset, renameExperiment, deleteExperiment, StoredDataset } from '@/hooks/useStoredDataset'
 import { getAuth, logout, useAuth } from '@/hooks/useAuth'
 import { useQueryClient } from '@tanstack/react-query'
@@ -178,12 +177,7 @@ export default function Sidebar() {
   }
 
   return (
-    <motion.aside
-      initial="hidden"
-      animate="visible"
-      variants={slideInFromLeftVariants}
-      className="w-64 bg-gradient-to-b from-slate-950 via-slate-900 to-black border-r border-purple-500/20 flex flex-col overflow-hidden"
-    >
+    <aside className="w-64 bg-gradient-to-b from-slate-950 via-slate-900 to-black border-r border-purple-500/20 flex flex-col overflow-hidden">
       {/* Logo */}
       <div className="p-6 flex items-center gap-3 shrink-0">
         <motion.div
@@ -275,7 +269,7 @@ export default function Sidebar() {
           <FlaskConical size={12} />
           Experiments
           <span className="ml-1 px-1.5 py-0.5 rounded bg-slate-800 text-gray-400 font-mono normal-case tracking-normal">
-            {experiments.length}
+            {mounted ? experiments.length : ''}
           </span>
           <span className="ml-auto">
             {expOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -329,6 +323,6 @@ export default function Sidebar() {
           <span>Logout</span>
         </motion.button>
       </div>
-    </motion.aside>
+    </aside>
   )
 }

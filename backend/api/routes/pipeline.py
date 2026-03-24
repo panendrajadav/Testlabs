@@ -65,7 +65,8 @@ def _run_pipeline_job(dataset_id: str, target_column: str, config: dict, loop: a
     """Runs in a thread — never awaits, uses loop.call_soon_threadsafe for WS pushes."""
 
     def _push(payload: dict):
-        asyncio.run_coroutine_threadsafe(_broadcast(dataset_id, payload), loop)
+        if not loop.is_closed():
+            asyncio.run_coroutine_threadsafe(_broadcast(dataset_id, payload), loop)
 
     try:
         pipeline_jobs[dataset_id]["status"] = "running"
@@ -216,7 +217,7 @@ async def run_pipeline_endpoint(request: PipelineRequest):
     _write_status(request.dataset_id, "queued", "Queued")
 
     # Submit to thread pool — event loop stays free
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     _pipeline_executor.submit(
         _run_pipeline_job,
         request.dataset_id,

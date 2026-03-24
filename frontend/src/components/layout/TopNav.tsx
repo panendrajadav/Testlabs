@@ -1,8 +1,7 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import { Bell, Search, Zap } from 'lucide-react'
-import { slideInFromTopVariants } from '@/animations/variants'
+import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 
 export default function TopNav() {
@@ -31,12 +30,7 @@ export default function TopNav() {
   }, [])
 
   return (
-    <motion.header
-      initial="hidden"
-      animate="visible"
-      variants={slideInFromTopVariants}
-      className="bg-gradient-to-r from-slate-950 via-slate-900 to-black border-b border-purple-500/20 glass px-8 py-4"
-    >
+    <header className="bg-gradient-to-r from-slate-950 via-slate-900 to-black border-b border-purple-500/20 glass px-8 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           {currentDataset ? (
@@ -81,6 +75,6 @@ export default function TopNav() {
           </motion.div>
         </div>
       </div>
-    </motion.header>
+    </header>
   )
 }

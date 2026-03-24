@@ -11,7 +11,7 @@ import { CheckCircle, Clock, AlertCircle, Zap, ArrowRight, Wifi, WifiOff } from 
 import Pipeline3DVisualizer from '@/components/visualization/Pipeline3DVisualizer'
 import { PipelineLoadingAnimation } from '@/components/loaders/LoadingAnimations'
 import { apiService } from '@/services/api'
-import { fsSetArtifacts, type ArtifactPayload } from '@/services/firestoreService'
+import { saveLocalArtifact } from '@/hooks/useStoredDataset'
 import type { PipelineStatus } from '@/types'
 
 export default function PipelinePage() {
@@ -36,7 +36,7 @@ export default function PipelinePage() {
         status:     'completed',
       })
 
-      // Push full artifacts to Firestore once per completion
+      // Save full artifacts to localStorage once per completion
       if (!artifactsSynced.current) {
         artifactsSynced.current = true
         const result = status.result
@@ -44,7 +44,7 @@ export default function PipelinePage() {
         if (version) {
           apiService.getArtifactSummary(datasetId, version)
             .then((summary) => {
-              const payload: ArtifactPayload = {
+              saveLocalArtifact(datasetId, version, {
                 version,
                 dataset_id:          datasetId,
                 model_name:          result.best_model          ?? '',
@@ -72,8 +72,7 @@ export default function PipelinePage() {
                 shap_values:         result.shap_values         ?? null,
                 roc_data:            result.roc_data            ?? null,
                 preprocessing_report: result.preprocessing_report ?? null,
-              }
-              return fsSetArtifacts(datasetId, version, payload)
+              })
             })
             .catch(console.error)
         }
@@ -186,14 +185,14 @@ export default function PipelinePage() {
         {status?.result && (
           <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { label: 'Best Model', value: status.result.best_model ?? '—', color: 'text-purple-400' },
+              { label: 'Best Model', value: status.result.best_model ? status.result.best_model.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—', color: 'text-purple-400' },
               { label: 'Best Score', value: status.result.best_score != null ? status.result.best_score.toFixed(4) : '—', color: 'text-cyan-400' },
-              { label: 'Task Type', value: status.result.task_type ?? '—', color: 'text-green-400' },
+              { label: 'Task Type', value: status.result.task_type ? status.result.task_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—', color: 'text-green-400' },
             ].map((item) => (
               <motion.div key={item.label} variants={itemVariants}
                 className="bg-slate-900/50 rounded-xl border border-purple-500/20 glass p-6">
                 <p className="text-gray-400 text-sm mb-1">{item.label}</p>
-                <p className={`font-bold text-xl capitalize ${item.color}`}>{item.value}</p>
+                <p className={`font-bold text-xl ${item.color}`}>{item.value}</p>
               </motion.div>
             ))}
           </motion.div>

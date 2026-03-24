@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { usePipelineStatus } from '@/hooks/useApi'
 import { useStoredDataset } from '@/hooks/useStoredDataset'
@@ -7,6 +8,7 @@ import { containerVariants, itemVariants } from '@/animations/variants'
 import { ShimmerLoader } from '@/components/loaders/LoadingAnimations'
 import { ModelMetricsChart, ROCCurveChart, FeatureImportanceChart } from '@/components/charts/ChartComponents'
 import { AlertTriangle, CheckCircle, Info } from 'lucide-react'
+import { getLocalArtifactVersions, getLocalArtifact } from '@/hooks/useStoredDataset'
 import type { PipelineStatus } from '@/types'
 
 const OVERFIT_WARN  = 0.05
@@ -77,7 +79,41 @@ export default function ModelsPage() {
 
   const { data: job, isLoading } = usePipelineStatus(datasetId)
   const status = job as PipelineStatus | undefined
-  const result = status?.result
+  const liveResult = status?.result
+
+  // localStorage fallback: load saved artifacts when backend has no live result
+  const [localResult, setLocalResult] = useState<any>(null)
+  const [localLoading, setLocalLoading] = useState(false)
+
+  useEffect(() => {
+    if (!datasetId || liveResult || status?.status === 'running' || status?.status === 'queued') return
+    setLocalLoading(true)
+    const versions = getLocalArtifactVersions(datasetId)
+    if (versions.length > 0) {
+      const data = getLocalArtifact(datasetId, versions[0])
+      if (data) {
+        setLocalResult({
+          best_model:           data.model_name,
+          best_score:           data.best_score,
+          task_type:            data.task_type,
+          best_params:          data.best_params ?? {},
+          target_column:        data.target_column,
+          selected_features:    data.selected_features ?? [],
+          justification:        data.justification,
+          is_underfit:          data.is_underfit,
+          evaluation_results:   data.evaluation_results ?? [],
+          agent_logs:           data.agent_logs ?? [],
+          eda_summary:          data.eda_summary,
+          shap_values:          data.shap_values,
+          roc_data:             data.roc_data,
+          preprocessing_report: data.preprocessing_report,
+        })
+      }
+    }
+    setLocalLoading(false)
+  }, [datasetId, liveResult, status?.status])
+
+  const result = liveResult ?? localResult
 
   if (!mounted) return null
 
@@ -89,7 +125,7 @@ export default function ModelsPage() {
     )
   }
 
-  if (isLoading || status?.status === 'running' || status?.status === 'queued') {
+  if (isLoading || localLoading || status?.status === 'running' || status?.status === 'queued') {
     return (
       <div className="min-h-screen bg-black p-8">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">

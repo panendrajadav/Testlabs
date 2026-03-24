@@ -11,10 +11,10 @@ router = APIRouter()
 ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "artifacts")
 
 
-def _version_meta(dataset_id: str, version: str) -> Dict[str, Any]:
+def _version_meta(dataset_id: str, version: str) -> Dict[str, Any] | None:
     path = os.path.join(ARTIFACTS_DIR, dataset_id, version, "metadata.json")
     if not os.path.exists(path):
-        return {"version": version, "dataset_id": dataset_id}
+        return None
     with open(path) as f:
         return json.load(f)
 
@@ -28,7 +28,7 @@ def _list_versions(dataset_id: str) -> List[Dict[str, Any]]:
         key=lambda v: int(v[1:]),
         reverse=True,
     )
-    return [_version_meta(dataset_id, v) for v in versions]
+    return [m for v in versions if (m := _version_meta(dataset_id, v)) is not None]
 
 
 # ── List all dataset IDs that have artifacts ─────────────────────────────────
@@ -67,7 +67,10 @@ def get_active_version(dataset_id: str):
         if not versions:
             raise HTTPException(status_code=404, detail="No artifacts found")
         version = versions[0]["version"]
-    return {"dataset_id": dataset_id, "active_version": version, **_version_meta(dataset_id, version)}
+    meta = _version_meta(dataset_id, version)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="No artifacts found")
+    return {"dataset_id": dataset_id, "active_version": version, **meta}
 
 
 # ── Global experiment history (all datasets) ──────────────────────────────────
@@ -127,7 +130,7 @@ def get_summary(dataset_id: str, version: str):
 @router.get("/{dataset_id}/{version}/metadata")
 def get_metadata(dataset_id: str, version: str):
     meta = _version_meta(dataset_id, version)
-    if not meta.get("model_name"):
+    if meta is None:
         raise HTTPException(status_code=404, detail="Version not found")
     return meta
 

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { fsSetAuthSession, fsClearAuthSession } from '@/services/firestoreService'
 
 const DEMO_USER = 'Panendra'
 const DEMO_PASS = '16062005'
@@ -26,20 +25,17 @@ export function login(username: string, password: string): boolean {
     _authCache = user
     localStorage.setItem(AUTH_KEY, JSON.stringify(user))
     window.dispatchEvent(new Event('authUpdated'))
-    // Firestore sync
-    fsSetAuthSession(user).catch(console.error)
     return true
   }
   return false
 }
 
 export function logout() {
-  const prev = _load()
   _authCache = null
   localStorage.removeItem(AUTH_KEY)
+  localStorage.removeItem('currentDataset')
   window.dispatchEvent(new Event('authUpdated'))
-  // Firestore sync
-  if (prev) fsClearAuthSession(prev.username).catch(console.error)
+  window.dispatchEvent(new Event('datasetUpdated'))
 }
 
 export function getAuth(): AuthUser | null {

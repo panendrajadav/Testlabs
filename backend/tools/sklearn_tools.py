@@ -63,6 +63,25 @@ try:
 except ImportError:
     logger.info("XGBoost not installed — skipping")
 
+# Try to add LightGBM if installed
+try:
+    from lightgbm import LGBMClassifier, LGBMRegressor
+    CLASSIFICATION_MODELS["lightgbm"] = LGBMClassifier(
+        n_estimators=200, learning_rate=0.05, max_depth=6,
+        num_leaves=31, subsample=0.8, colsample_bytree=0.8,
+        reg_alpha=0.1, reg_lambda=1.0,
+        random_state=42, verbosity=-1, n_jobs=1,
+    )
+    REGRESSION_MODELS["lightgbm"] = LGBMRegressor(
+        n_estimators=200, learning_rate=0.05, max_depth=6,
+        num_leaves=31, subsample=0.8, colsample_bytree=0.8,
+        reg_alpha=0.1, reg_lambda=1.0,
+        random_state=42, verbosity=-1, n_jobs=1,
+    )
+    logger.info("LightGBM available — added to model registry")
+except ImportError:
+    logger.info("LightGBM not installed — skipping")
+
 # ── HPO search spaces with explicit L1/L2 regularization ─────────────────────
 
 _HPO_GRIDS: Dict[str, Dict[str, Any]] = {
@@ -115,13 +134,23 @@ _HPO_GRIDS: Dict[str, Dict[str, Any]] = {
     "ridge":       {"alpha": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]},
     "lasso":       {"alpha": [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]},
     "elastic_net": {"alpha": [0.001, 0.01, 0.1, 1.0], "l1_ratio": [0.1, 0.3, 0.5, 0.7, 0.9]},
+    "lightgbm": {
+        "n_estimators":    [100, 200, 300],
+        "max_depth":       [4, 6, 8, -1],
+        "learning_rate":   [0.01, 0.05, 0.1],
+        "num_leaves":      [15, 31, 63],
+        "subsample":       [0.6, 0.8, 1.0],
+        "colsample_bytree":[0.6, 0.8, 1.0],
+        "reg_alpha":       [0.0, 0.1, 0.5],
+        "reg_lambda":      [0.5, 1.0, 2.0],
+    },
 }
 
 _NEEDS_SCALING   = {"logistic_regression", "svm", "knn", "ridge", "lasso", "linear_regression", "elastic_net"}
-_HPO_N_ITER      = 5    # RandomizedSearchCV iterations per model (phase 2 / full data)
-_HPO_N_ITER_FAST = 3    # phase 1 screening iterations
+_HPO_N_ITER      = 10   # RandomizedSearchCV iterations per model (phase 2 / full data)
+_HPO_N_ITER_FAST = 5    # phase 1 screening iterations
 _SUBSAMPLE_RATIO = 0.4  # fraction used for phase-1 model screening
-_TOP_K_MODELS    = 2    # top-K models promoted to phase-2 full training
+_TOP_K_MODELS    = 5    # top-K models promoted to phase-2 full training
 # Models that support early stopping via eval_set
 _EARLY_STOP_MODELS = {"xgboost", "lightgbm"}
 
@@ -301,13 +330,15 @@ def _train_single(
 
         if task_type == "classification":
             cv = StratifiedKFold(n_splits=safe_folds, shuffle=True, random_state=42)
-            cv_scores = cross_val_score(pipe, X_train, y_train, cv=cv, scoring="accuracy", n_jobs=-1)
+            cv_scores     = cross_val_score(pipe, X_train, y_train, cv=cv, scoring="accuracy", n_jobs=-1)
+            cv_roc_scores = cross_val_score(pipe, X_train, y_train, cv=cv, scoring="roc_auc_ovr", n_jobs=-1)
         else:
             cv = KFold(n_splits=safe_folds, shuffle=True, random_state=42)
             cv_scores = cross_val_score(pipe, X_train, y_train, cv=cv, scoring="r2", n_jobs=-1)
 
         cv_score = float(np.mean(cv_scores))
         cv_std   = float(np.std(cv_scores))
+        cv_roc   = float(np.mean(cv_roc_scores)) if task_type == "classification" else None
 
         # ── 4. Final fit + predict (early stopping for XGB/LGB) ──────────────
         if model_name in _EARLY_STOP_MODELS and not isinstance(pipe, (Pipeline, ImbPipeline)):
@@ -353,6 +384,22 @@ def _train_single(
                         overfit_gap = round(train_score - test_score, 4)
                         logger.info(f"  [{model_name}] Regularization fallback applied, new gap={overfit_gap:.4f}")
 
+            # F1 + ROC-AUC on test set
+            try:
+                test_f1 = float(f1_score(y_test, test_pred, average="weighted"))
+            except Exception:
+                test_f1 = 0.0
+            try:
+                from sklearn.metrics import roc_auc_score
+                if hasattr(pipe, "predict_proba"):
+                    y_prob = pipe.predict_proba(X_test)
+                    test_roc = float(roc_auc_score(y_test, y_prob if y_prob.shape[1] > 2 else y_prob[:, 1],
+                                                   multi_class="ovr", average="weighted"))
+                else:
+                    test_roc = cv_roc
+            except Exception:
+                test_roc = cv_roc or cv_score
+
             metrics = {
                 "accuracy":        round(cv_score, 4),
                 "test_accuracy":   round(test_score, 4),
@@ -364,15 +411,15 @@ def _train_single(
                 "test_set_size":   int(len(y_test)),
                 "train_set_size":  int(len(y_train)),
                 "best_params":     best_params,
+                "f1_score":        round(test_f1, 4),
+                "roc_auc":         round(test_roc, 4) if test_roc else None,
+                "cv_roc_auc":      round(cv_roc, 4) if cv_roc else None,
             }
-            try:
-                metrics["f1_score"] = round(float(f1_score(y_test, test_pred, average="weighted")), 4)
-            except Exception:
-                pass
 
-            # Composite: 50% cv + 30% test + 20% stability
+            # Composite: 40% CV-ROC-AUC + 30% test-F1 + 20% test-accuracy + 10% stability
+            # ROC-AUC + F1 are far better than raw accuracy for imbalanced datasets (e.g. diabetes)
             stability = max(0.0, 1.0 - cv_std * 10)
-            primary   = 0.5 * cv_score + 0.3 * test_score + 0.2 * stability
+            primary   = 0.4 * (cv_roc or cv_score) + 0.3 * test_f1 + 0.2 * test_score + 0.1 * stability
             if overfit_gap > 0.10:
                 penalty = (overfit_gap - 0.10) * 0.8
                 primary = max(0.0, primary - penalty)
@@ -462,8 +509,8 @@ def train_all_models_parallel(
 ) -> List[Dict[str, Any]]:
     """
     Two-phase progressive training:
-      Phase 1 — all models on 25% subsample, fast HPO (5 iter), pick top-3.
-      Phase 2 — top-3 retrained on full data, full HPO (12 iter) + early stopping.
+      Phase 1 — all models on subsample, fast HPO, pick top-K  (skipped for small datasets)
+      Phase 2 — top-K retrained on full data, full HPO + early stopping.
     Composite ranking: 0.5*cv + 0.3*test + 0.2*stability, penalised for overfit gap.
     """
     import copy
@@ -480,18 +527,46 @@ def train_all_models_parallel(
             use_smote = True
 
     model_registry = CLASSIFICATION_MODELS if task_type == "classification" else REGRESSION_MODELS
+    n_models = len(model_registry)
+    effective_workers = min(max_workers, n_models, 8)
+
+    # ── Skip Phase 1 for small datasets — subsample is too noisy to be useful ─
+    small_dataset = len(y_train) < 500
+
+    if small_dataset:
+        logger.info(
+            f"Small dataset ({len(y_train)} rows) — skipping Phase 1, training all "
+            f"{n_models} {task_type} models on full data | HPO={_HPO_N_ITER} iter | workers={effective_workers}"
+        )
+        results: List[Dict[str, Any]] = []
+        with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+            futures = {
+                executor.submit(
+                    _train_single,
+                    name, copy.deepcopy(model),
+                    X_train, X_test, y_train, y_test,
+                    task_type, cv_folds, use_smote,
+                    _HPO_N_ITER,
+                ): name
+                for name, model in model_registry.items()
+            }
+            for future in as_completed(futures):
+                results.append(future.result())
+        results.sort(key=lambda r: r["score"], reverse=True)
+        logger.info(f"Final ranking: {[(r['model_name'], r['score']) for r in results]}")
+        return results
 
     # ── Phase 1: screen all models on subsample ───────────────────────────────
     X_sub, y_sub = _subsample(X_train, y_train, task_type)
     n_folds_sub  = _adaptive_cv_folds(len(y_sub), len(np.unique(y_sub)) if task_type == "classification" else 1)
     logger.info(
-        f"Phase 1 screening: {len(model_registry)} {task_type} models on "
+        f"Phase 1 screening: {n_models} {task_type} models on "
         f"{len(y_sub)}/{len(y_train)} samples ({_SUBSAMPLE_RATIO:.0%}) | "
-        f"CV={n_folds_sub}-fold | HPO={_HPO_N_ITER_FAST} iter | workers={max_workers}"
+        f"CV={n_folds_sub}-fold | HPO={_HPO_N_ITER_FAST} iter | workers={effective_workers}"
     )
 
     phase1: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with ThreadPoolExecutor(max_workers=effective_workers) as executor:
         futures = {
             executor.submit(
                 _train_single,
@@ -517,7 +592,7 @@ def train_all_models_parallel(
     )
 
     phase2: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=min(max_workers, _TOP_K_MODELS)) as executor:
+    with ThreadPoolExecutor(max_workers=min(effective_workers, _TOP_K_MODELS)) as executor:
         futures = {
             executor.submit(
                 _train_single,
@@ -531,7 +606,7 @@ def train_all_models_parallel(
         for future in as_completed(futures):
             phase2.append(future.result())
 
-    # Merge: phase2 results for top-K, phase1 results for the rest (already scored)
+    # Merge: phase2 results for top-K, phase1 results for the rest
     top_set = set(top_names)
     rest    = [r for r in phase1 if r["model_name"] not in top_set]
     results = phase2 + rest

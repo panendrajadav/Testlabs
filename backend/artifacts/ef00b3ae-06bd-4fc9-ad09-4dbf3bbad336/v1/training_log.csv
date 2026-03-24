@@ -1,8 +1,0 @@
-dataset_id,version,timestamp,model_name,composite_score,cv_score,test_score,train_score,f1_score,roc_auc,rmse,mae,cv_std,overfit_gap,overfit_penalty,train_set_size,test_set_size,best_params
-ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336,v1,2026-03-22T14:54:30.837147+00:00,svm,0.6165,0.6006,0.6594,0.605,0.5974,0.7984,,,0.0408,-0.0544,0.0,914,229,"{""kernel"": ""rbf"", ""gamma"": ""auto"", ""C"": 100.0}"
-ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336,v1,2026-03-22T14:54:30.837147+00:00,logistic_regression,0.5863,0.5886,0.6376,0.6039,0.6165,,,,0.0497,-0.0336,0.0,914,229,"{""penalty"": ""l2"", ""l1_ratio"": 0.75, ""C"": 0.1}"
-ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336,v1,2026-03-22T14:54:30.837147+00:00,decision_tree,0.5446,0.558,0.559,0.6368,0.5365,,,,0.051,0.0778,0.0,914,229,"{""min_samples_split"": 10, ""min_samples_leaf"": 1, ""max_depth"": 4, ""ccp_alpha"": 0.001}"
-ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336,v1,2026-03-22T14:54:30.837147+00:00,gradient_boosting,0.4464,0.6839,0.6157,0.9123,0.5759,,,,0.0615,0.2966,0.1573,228,229,"{""subsample"": 0.8, ""n_estimators"": 200, ""min_samples_leaf"": 5, ""max_depth"": 3, ""learning_rate"": 0.01}"
-ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336,v1,2026-03-22T14:54:30.837147+00:00,random_forest,0.4456,0.6749,0.5895,0.8246,0.5534,,,,0.0803,0.235,0.108,228,229,"{""n_estimators"": 300, ""min_samples_leaf"": 1, ""min_impurity_decrease"": 0.0, ""max_features"": 0.5, ""max_depth"": 8}"
-ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336,v1,2026-03-22T14:54:30.837147+00:00,knn,0.2054,0.6307,0.5546,1.0,0.5237,,,,0.1113,0.4454,0.2763,228,229,"{""weights"": ""distance"", ""n_neighbors"": 15, ""metric"": ""euclidean""}"
-ef00b3ae-06bd-4fc9-ad09-4dbf3bbad336,v1,2026-03-22T14:54:30.837147+00:00,xgboost,-999.0,,,,,,,,,,,,,{}

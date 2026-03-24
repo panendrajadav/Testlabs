@@ -56,7 +56,7 @@ def _compute_shap(model, X, y, feature_names: List[str], model_name: str) -> Dic
     try:
         import shap
 
-        tree_models = {"random_forest", "gradient_boosting"}
+        tree_models = {"random_forest", "gradient_boosting", "xgboost", "lightgbm"}
         linear_models = {"logistic_regression", "ridge", "lasso", "linear_regression"}
 
         if model_name in tree_models:
@@ -154,7 +154,7 @@ def parallel_evaluation_agent(state: AutoMLState, config: Dict[str, Any]) -> Aut
     all_results = train_all_models_parallel(
         X, y, task_type,
         cv_folds=cv_folds,
-        max_workers=len(state.get("_model_list", []) or [5]),  # up to 5 workers
+        max_workers=8,
     )
 
     # ── Pick best (first after sort-by-score) ─────────────────────────────────

@@ -5,19 +5,19 @@ export const containerVariants: Variants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
+      staggerChildren: 0.04,
+      delayChildren: 0,
     },
   },
 }
 
 export const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.6,
+      duration: 0.2,
       ease: 'easeOut',
     },
   },
@@ -27,43 +27,35 @@ export const fadeInVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { duration: 0.5 },
+    transition: { duration: 0.2 },
   },
 }
 
 export const slideInFromLeftVariants: Variants = {
-  hidden: { opacity: 0, x: -50 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.6, ease: 'easeOut' },
-  },
+  hidden: { opacity: 1, x: 0 },
+  visible: { opacity: 1, x: 0 },
 }
 
 export const slideInFromRightVariants: Variants = {
-  hidden: { opacity: 0, x: 50 },
+  hidden: { opacity: 0, x: 20 },
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.6, ease: 'easeOut' },
+    transition: { duration: 0.2, ease: 'easeOut' },
   },
 }
 
 export const slideInFromTopVariants: Variants = {
-  hidden: { opacity: 0, y: -50 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: 'easeOut' },
-  },
+  hidden: { opacity: 1, y: 0 },
+  visible: { opacity: 1, y: 0 },
 }
 
 export const scaleInVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.8 },
+  hidden: { opacity: 0, scale: 0.95 },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.6, ease: 'easeOut' },
+    transition: { duration: 0.2, ease: 'easeOut' },
   },
 }
 
@@ -131,13 +123,12 @@ export const modalVariants: Variants = {
 }
 
 export const Pipeline3DVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.8, rotateX: 90 },
+  hidden: { opacity: 0, scale: 0.95 },
   visible: {
     opacity: 1,
     scale: 1,
-    rotateX: 0,
     transition: {
-      duration: 0.8,
+      duration: 0.25,
       ease: 'easeOut',
     },
   },

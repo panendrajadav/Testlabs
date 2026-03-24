@@ -6,6 +6,27 @@ import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import TopNav from '@/components/layout/TopNav'
 
+function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const [isFullScreen, setIsFullScreen] = useState(true)
+
+  useEffect(() => {
+    setIsFullScreen(pathname === '/' || pathname === '/login')
+  }, [pathname])
+
+  if (isFullScreen) return <>{children}</>
+
+  return (
+    <div className="flex h-screen bg-black overflow-hidden">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopNav />
+        <main className="flex-1 overflow-y-auto">{children}</main>
+      </div>
+    </div>
+  )
+}
+
 export default function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () => new QueryClient({
@@ -19,36 +40,10 @@ export default function Providers({ children }: { children: ReactNode }) {
       },
     })
   )
-  const pathname = usePathname()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
-  const isFullScreen = pathname === '/' || pathname === '/login'
-
-  // Render children only — no layout shell until client has mounted.
-  // This ensures SSR and first client render always agree, preventing
-  // hydration mismatches caused by localStorage reads in Sidebar.
-  if (!mounted) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
-    )
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isFullScreen ? (
-        children
-      ) : (
-        <div className="flex h-screen bg-black overflow-hidden">
-          <Sidebar />
-          <div className="flex-1 flex flex-col min-w-0">
-            <TopNav />
-            <main className="flex-1 overflow-y-auto">{children}</main>
-          </div>
-        </div>
-      )}
+      <AppShell>{children}</AppShell>
     </QueryClientProvider>
   )
 }

@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { useChat } from '@/hooks/useApi'
-import { useStoredDataset } from '@/hooks/useStoredDataset'
+import { useStoredDataset, getChatHistory, saveChatHistory } from '@/hooks/useStoredDataset'
 import { Send, Sparkles, BarChart2, Brain, Zap, Database } from 'lucide-react'
 import { PulseLoader } from '@/components/loaders/LoadingAnimations'
+import CodeBlock from '@/components/chat/CodeBlock'
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false })
 
@@ -123,6 +124,21 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
   )
 }
 
+// Parse message content into text and code segments
+function parseContent(raw: string): { type: 'text' | 'code'; content: string; language?: string }[] {
+  const segments: { type: 'text' | 'code'; content: string; language?: string }[] = []
+  const regex = /```([\w]*)?\n?([\s\S]*?)```/g
+  let last = 0
+  let match
+  while ((match = regex.exec(raw)) !== null) {
+    if (match.index > last) segments.push({ type: 'text', content: raw.slice(last, match.index) })
+    segments.push({ type: 'code', language: match[1] || 'python', content: match[2].trim() })
+    last = match.index + match[0].length
+  }
+  if (last < raw.length) segments.push({ type: 'text', content: raw.slice(last) })
+  return segments
+}
+
 // Decode HTML entities that occasionally leak from the LLM response
 function decodeEntities(str: string): string {
   if (typeof document === 'undefined') return str
@@ -173,23 +189,37 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatMutation = useChat()
 
+  // Load history when datasetId changes
+  useEffect(() => {
+    if (!datasetId) { setMessages([]); return }
+    setMessages(getChatHistory(datasetId))
+  }, [datasetId])
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isThinking])
+
+  const addMessage = (msg: Message) => {
+    setMessages(prev => {
+      const next = [...prev, msg]
+      if (datasetId) saveChatHistory(datasetId, next)
+      return next
+    })
+  }
 
   const send = async (question: string) => {
     if (!question.trim() || !datasetId || isThinking) return
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'user', content: question }])
+    addMessage({ id: crypto.randomUUID(), role: 'user', content: question })
     setInput('')
     setIsThinking(true)
     try {
       const res = await chatMutation.mutateAsync({ datasetId, question })
-      setMessages((prev) => [...prev, {
+      addMessage({
         id: crypto.randomUUID(),
         role: 'assistant',
         content: decodeEntities(res.answer ?? ''),
         chart: res.chart ?? null,
-      }])
+      })
     } catch {
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: 'Something went wrong. Please try again.', chart: null }])
+      addMessage({ id: crypto.randomUUID(), role: 'assistant', content: 'Something went wrong. Please try again.', chart: null })
     } finally {
       setIsThinking(false)
     }
@@ -329,20 +359,29 @@ export default function ChatPage() {
                   {/* Bubble */}
                   <TiltCard>
                     <div
-                      className="px-5 py-3.5 rounded-2xl text-sm text-white whitespace-pre-wrap leading-relaxed"
+                      className="rounded-2xl text-sm text-white leading-relaxed"
                       style={msg.role === 'user' ? {
+                        padding: '14px 20px',
                         background: 'linear-gradient(135deg, rgba(124,58,237,0.85), rgba(6,182,212,0.6))',
                         boxShadow: '0 8px 32px rgba(124,58,237,0.35), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
                         border: '1px solid rgba(139,92,246,0.5)',
                         backdropFilter: 'blur(16px)',
                       } : {
+                        padding: '14px 20px',
                         background: 'rgba(15,15,30,0.75)',
                         boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)',
                         border: '1px solid rgba(139,92,246,0.2)',
                         backdropFilter: 'blur(20px)',
                       }}
                     >
-                      {decodeEntities(msg.content)}
+                      {msg.role === 'user'
+                        ? decodeEntities(msg.content)
+                        : parseContent(decodeEntities(msg.content)).map((seg, i) =>
+                            seg.type === 'code'
+                              ? <CodeBlock key={i} code={seg.content} language={seg.language} />
+                              : <span key={i} className="whitespace-pre-wrap">{seg.content}</span>
+                          )
+                      }
                     </div>
                   </TiltCard>
 
