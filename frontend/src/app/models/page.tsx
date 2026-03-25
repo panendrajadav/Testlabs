@@ -147,7 +147,7 @@ export default function ModelsPage() {
 
   const isClassification = result.task_type === 'classification'
   const evalResults = result.evaluation_results ?? []
-  const bestResult = evalResults.find((r) => (r.model_name ?? r.model) === result.best_model)
+  const bestResult = evalResults.find((r: any) => (r.model_name ?? r.model) === result.best_model)
   const metrics = bestResult?.metrics ?? {}
   const overfitGap = (metrics.overfit_gap as number) ?? 0
   const testSetSize = (metrics.test_set_size as number) ?? null
