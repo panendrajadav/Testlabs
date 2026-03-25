@@ -34,6 +34,22 @@ from utils.logger import logger
 ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts")
 
 
+def _get_firestore():
+    """Lazy Firestore client — only imported when needed."""
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, firestore
+        if not firebase_admin._apps:
+            cred_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "firebase-service-account.json")
+            if os.path.exists(cred_path):
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+        return firestore.client()
+    except Exception as e:
+        logger.warning(f"Firestore init failed: {e}")
+        return None
+
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -563,6 +579,23 @@ def _save_training_log(eval_results: List[Dict[str, Any]], task_type: str,
         if write_header and rows:
             writer.writeheader()
         writer.writerows(rows)
+
+    # Save to Firestore
+    _save_to_firestore_experiments(rows, dataset_id, version)
+
+
+def _save_to_firestore_experiments(rows: List[Dict[str, Any]], dataset_id: str, version: str):
+    """Save training log rows to Firestore experiments collection."""
+    try:
+        db = _get_firestore()
+        if not db:
+            return
+        for row in rows:
+            doc_id = f"{dataset_id}_{version}_{row['model_name']}"
+            db.collection('experiments').document(doc_id).set(row)
+        logger.info(f"Saved {len(rows)} training log rows to Firestore")
+    except Exception as e:
+        logger.warning(f"Firestore experiments save failed: {e}")
 
 
 # ── Step 6: Experiment log (JSON — full structured record) ────────────────────
