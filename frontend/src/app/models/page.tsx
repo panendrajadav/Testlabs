@@ -207,7 +207,7 @@ export default function ModelsPage() {
   })()
 
   const shapData = result.shap_values
-    ? result.shap_values.feature_names.map((f, i) => ({ feature: f, importance: result.shap_values!.mean_abs_shap[i] }))
+    ? result.shap_values.feature_names.map((f: string, i: number) => ({ feature: f, importance: result.shap_values!.mean_abs_shap[i] }))
     : []
 
   return (
