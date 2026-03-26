@@ -194,13 +194,13 @@ export default function ModelsPage() {
   const rocPoints = (() => {
     const roc = result.roc_data
     if (!roc) return []
-    if (roc.fpr && roc.tpr) return roc.fpr.map((fpr, i) => ({ fpr, tpr: roc.tpr![i] }))
+    if (roc.fpr && roc.tpr) return roc.fpr.map((fpr: number, i: number) => ({ fpr, tpr: roc.tpr![i] }))
     // multiclass: use first class curve
     if (roc.curves) {
       const firstKey = Object.keys(roc.curves)[0]
       if (firstKey) {
         const c = roc.curves[firstKey]
-        return c.fpr.map((fpr, i) => ({ fpr, tpr: c.tpr[i] }))
+        return c.fpr.map((fpr: number, i: number) => ({ fpr, tpr: c.tpr[i] }))
       }
     }
     return []
